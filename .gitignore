@@ -1,0 +1,14 @@
+# Dependencies
+frontend/node_modules/
+frontend/package.json.md5
+
+# Frontend build output
+frontend/dist/
+
+# Wails binaries and local runtime data
+build/bin/
+data/
+
+# OS/editor noise
+.DS_Store
+*.log
