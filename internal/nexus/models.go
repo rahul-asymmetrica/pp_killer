@@ -769,6 +769,116 @@ type AccountingSnapshot struct {
 	TrialBalance     []AccountingBalanceRow `json:"trialBalance"`
 }
 
+type AdminAnalytics struct {
+	GeneratedAt        string                    `json:"generatedAt"`
+	RangeKey           string                    `json:"rangeKey"`
+	RangeLabel         string                    `json:"rangeLabel"`
+	DemoFallback       bool                      `json:"demoFallback"`
+	Executive          []AnalyticsMetric         `json:"executive"`
+	SalesTrend         []AnalyticsPoint          `json:"salesTrend"`
+	HourlyHeatmap      []AnalyticsPoint          `json:"hourlyHeatmap"`
+	TenderMix          []AnalyticsPoint          `json:"tenderMix"`
+	CategoryMix        []AnalyticsPoint          `json:"categoryMix"`
+	ItemVelocity       []AnalyticsPoint          `json:"itemVelocity"`
+	ContributionMargin []AnalyticsPoint          `json:"contributionMargin"`
+	InventoryHealth    []InventoryHealthRow      `json:"inventoryHealth"`
+	KitchenPerformance []KitchenPerformanceRow   `json:"kitchenPerformance"`
+	PurchaseTrend      []AnalyticsPoint          `json:"purchaseTrend"`
+	ItemMatrix         []ItemMatrixBucket        `json:"itemMatrix"`
+	Settlement         SettlementHealth          `json:"settlement"`
+	Exceptions         []AnalyticsException      `json:"exceptions"`
+	Recommendations    []AnalyticsRecommendation `json:"recommendations"`
+	SnapshotStatus     AnalyticsSnapshotStatus   `json:"snapshotStatus"`
+}
+
+type AnalyticsMetric struct {
+	ID     string  `json:"id"`
+	Label  string  `json:"label"`
+	Value  float64 `json:"value"`
+	Format string  `json:"format"`
+	Detail string  `json:"detail"`
+	Tone   string  `json:"tone"`
+}
+
+type AnalyticsPoint struct {
+	Label string  `json:"label"`
+	Value float64 `json:"value"`
+	Count int     `json:"count"`
+	Tone  string  `json:"tone"`
+}
+
+type InventoryHealthRow struct {
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	OnHandQty    float64 `json:"onHandQty"`
+	ReorderPoint float64 `json:"reorderPoint"`
+	Unit         string  `json:"unit"`
+	RiskScore    float64 `json:"riskScore"`
+	Status       string  `json:"status"`
+}
+
+type KitchenPerformanceRow struct {
+	RouteName     string  `json:"routeName"`
+	OpenTickets   int     `json:"openTickets"`
+	ReadyTickets  int     `json:"readyTickets"`
+	ServedTickets int     `json:"servedTickets"`
+	AverageAgeMin float64 `json:"averageAgeMin"`
+	OldestAgeMin  float64 `json:"oldestAgeMin"`
+}
+
+type ItemMatrixBucket struct {
+	ID          string            `json:"id"`
+	Label       string            `json:"label"`
+	Description string            `json:"description"`
+	Items       []ItemMatrixEntry `json:"items"`
+}
+
+type ItemMatrixEntry struct {
+	ItemID    string  `json:"itemId"`
+	Name      string  `json:"name"`
+	Category  string  `json:"category"`
+	Quantity  int     `json:"quantity"`
+	Sales     float64 `json:"sales"`
+	Margin    float64 `json:"margin"`
+	MarginPct float64 `json:"marginPct"`
+}
+
+type SettlementHealth struct {
+	CashExpected     float64 `json:"cashExpected"`
+	CashVariance     float64 `json:"cashVariance"`
+	UPITotal         float64 `json:"upiTotal"`
+	CardTotal        float64 `json:"cardTotal"`
+	RazorpayTotal    float64 `json:"razorpayTotal"`
+	RazorpayClearing float64 `json:"razorpayClearing"`
+	TaxPayable       float64 `json:"taxPayable"`
+	VendorPayables   float64 `json:"vendorPayables"`
+	RefundTotal      float64 `json:"refundTotal"`
+}
+
+type AnalyticsException struct {
+	ID       string  `json:"id"`
+	Kind     string  `json:"kind"`
+	Title    string  `json:"title"`
+	Detail   string  `json:"detail"`
+	Severity string  `json:"severity"`
+	Value    float64 `json:"value"`
+}
+
+type AnalyticsRecommendation struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Detail   string `json:"detail"`
+	Priority int    `json:"priority"`
+	Page     string `json:"page"`
+}
+
+type AnalyticsSnapshotStatus struct {
+	DailyRows  int    `json:"dailyRows"`
+	ItemRows   int    `json:"itemRows"`
+	HourlyRows int    `json:"hourlyRows"`
+	UpdatedAt  string `json:"updatedAt"`
+}
+
 type ExportResult struct {
 	Kind     string `json:"kind"`
 	Path     string `json:"path"`

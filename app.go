@@ -49,6 +49,13 @@ func (a *App) GetDashboard() (nexus.Dashboard, error) {
 	return a.store.Dashboard()
 }
 
+func (a *App) GetAdminAnalytics(rangeKey string) (nexus.AdminAnalytics, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.AdminAnalytics{}, err
+	}
+	return a.store.GetAdminAnalytics(rangeKey)
+}
+
 func (a *App) RecordSale(input nexus.SaleInput) (nexus.Dashboard, error) {
 	if err := a.ensureReady(); err != nil {
 		return nexus.Dashboard{}, err

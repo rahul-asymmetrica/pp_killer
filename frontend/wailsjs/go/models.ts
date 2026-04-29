@@ -1,5 +1,5 @@
 export namespace nexus {
-	
+
 	export class AccountingBalanceRow {
 	    ledgerId: string;
 	    ledgerName: string;
@@ -9,11 +9,11 @@ export namespace nexus {
 	    creditTotal: number;
 	    balance: number;
 	    balanceSide: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AccountingBalanceRow(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ledgerId = source["ledgerId"];
@@ -35,11 +35,11 @@ export namespace nexus {
 	    refundTotal: number;
 	    voucherCount: number;
 	    trialBalance: AccountingBalanceRow[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AccountingSnapshot(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.salesTotal = source["salesTotal"];
@@ -51,7 +51,7 @@ export namespace nexus {
 	        this.voucherCount = source["voucherCount"];
 	        this.trialBalance = this.convertValues(source["trialBalance"], AccountingBalanceRow);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -76,11 +76,11 @@ export namespace nexus {
 	    quantity: number;
 	    notes: string;
 	    modifierIds: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AddOrderSessionLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
@@ -90,16 +90,321 @@ export namespace nexus {
 	        this.modifierIds = source["modifierIds"];
 	    }
 	}
+	export class AnalyticsSnapshotStatus {
+	    dailyRows: number;
+	    itemRows: number;
+	    hourlyRows: number;
+	    updatedAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AnalyticsSnapshotStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dailyRows = source["dailyRows"];
+	        this.itemRows = source["itemRows"];
+	        this.hourlyRows = source["hourlyRows"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class AnalyticsRecommendation {
+	    id: string;
+	    title: string;
+	    detail: string;
+	    priority: number;
+	    page: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AnalyticsRecommendation(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.detail = source["detail"];
+	        this.priority = source["priority"];
+	        this.page = source["page"];
+	    }
+	}
+	export class AnalyticsException {
+	    id: string;
+	    kind: string;
+	    title: string;
+	    detail: string;
+	    severity: string;
+	    value: number;
+
+	    static createFrom(source: any = {}) {
+	        return new AnalyticsException(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.title = source["title"];
+	        this.detail = source["detail"];
+	        this.severity = source["severity"];
+	        this.value = source["value"];
+	    }
+	}
+	export class SettlementHealth {
+	    cashExpected: number;
+	    cashVariance: number;
+	    upiTotal: number;
+	    cardTotal: number;
+	    razorpayTotal: number;
+	    razorpayClearing: number;
+	    taxPayable: number;
+	    vendorPayables: number;
+	    refundTotal: number;
+
+	    static createFrom(source: any = {}) {
+	        return new SettlementHealth(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cashExpected = source["cashExpected"];
+	        this.cashVariance = source["cashVariance"];
+	        this.upiTotal = source["upiTotal"];
+	        this.cardTotal = source["cardTotal"];
+	        this.razorpayTotal = source["razorpayTotal"];
+	        this.razorpayClearing = source["razorpayClearing"];
+	        this.taxPayable = source["taxPayable"];
+	        this.vendorPayables = source["vendorPayables"];
+	        this.refundTotal = source["refundTotal"];
+	    }
+	}
+	export class ItemMatrixEntry {
+	    itemId: string;
+	    name: string;
+	    category: string;
+	    quantity: number;
+	    sales: number;
+	    margin: number;
+	    marginPct: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ItemMatrixEntry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.itemId = source["itemId"];
+	        this.name = source["name"];
+	        this.category = source["category"];
+	        this.quantity = source["quantity"];
+	        this.sales = source["sales"];
+	        this.margin = source["margin"];
+	        this.marginPct = source["marginPct"];
+	    }
+	}
+	export class ItemMatrixBucket {
+	    id: string;
+	    label: string;
+	    description: string;
+	    items: ItemMatrixEntry[];
+
+	    static createFrom(source: any = {}) {
+	        return new ItemMatrixBucket(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.description = source["description"];
+	        this.items = this.convertValues(source["items"], ItemMatrixEntry);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class KitchenPerformanceRow {
+	    routeName: string;
+	    openTickets: number;
+	    readyTickets: number;
+	    servedTickets: number;
+	    averageAgeMin: number;
+	    oldestAgeMin: number;
+
+	    static createFrom(source: any = {}) {
+	        return new KitchenPerformanceRow(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.routeName = source["routeName"];
+	        this.openTickets = source["openTickets"];
+	        this.readyTickets = source["readyTickets"];
+	        this.servedTickets = source["servedTickets"];
+	        this.averageAgeMin = source["averageAgeMin"];
+	        this.oldestAgeMin = source["oldestAgeMin"];
+	    }
+	}
+	export class InventoryHealthRow {
+	    id: string;
+	    name: string;
+	    onHandQty: number;
+	    reorderPoint: number;
+	    unit: string;
+	    riskScore: number;
+	    status: string;
+
+	    static createFrom(source: any = {}) {
+	        return new InventoryHealthRow(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.onHandQty = source["onHandQty"];
+	        this.reorderPoint = source["reorderPoint"];
+	        this.unit = source["unit"];
+	        this.riskScore = source["riskScore"];
+	        this.status = source["status"];
+	    }
+	}
+	export class AnalyticsPoint {
+	    label: string;
+	    value: number;
+	    count: number;
+	    tone: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AnalyticsPoint(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.value = source["value"];
+	        this.count = source["count"];
+	        this.tone = source["tone"];
+	    }
+	}
+	export class AnalyticsMetric {
+	    id: string;
+	    label: string;
+	    value: number;
+	    format: string;
+	    detail: string;
+	    tone: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AnalyticsMetric(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.value = source["value"];
+	        this.format = source["format"];
+	        this.detail = source["detail"];
+	        this.tone = source["tone"];
+	    }
+	}
+	export class AdminAnalytics {
+	    generatedAt: string;
+	    rangeKey: string;
+	    rangeLabel: string;
+	    demoFallback: boolean;
+	    executive: AnalyticsMetric[];
+	    salesTrend: AnalyticsPoint[];
+	    hourlyHeatmap: AnalyticsPoint[];
+	    tenderMix: AnalyticsPoint[];
+	    categoryMix: AnalyticsPoint[];
+	    itemVelocity: AnalyticsPoint[];
+	    contributionMargin: AnalyticsPoint[];
+	    inventoryHealth: InventoryHealthRow[];
+	    kitchenPerformance: KitchenPerformanceRow[];
+	    purchaseTrend: AnalyticsPoint[];
+	    itemMatrix: ItemMatrixBucket[];
+	    settlement: SettlementHealth;
+	    exceptions: AnalyticsException[];
+	    recommendations: AnalyticsRecommendation[];
+	    snapshotStatus: AnalyticsSnapshotStatus;
+
+	    static createFrom(source: any = {}) {
+	        return new AdminAnalytics(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.generatedAt = source["generatedAt"];
+	        this.rangeKey = source["rangeKey"];
+	        this.rangeLabel = source["rangeLabel"];
+	        this.demoFallback = source["demoFallback"];
+	        this.executive = this.convertValues(source["executive"], AnalyticsMetric);
+	        this.salesTrend = this.convertValues(source["salesTrend"], AnalyticsPoint);
+	        this.hourlyHeatmap = this.convertValues(source["hourlyHeatmap"], AnalyticsPoint);
+	        this.tenderMix = this.convertValues(source["tenderMix"], AnalyticsPoint);
+	        this.categoryMix = this.convertValues(source["categoryMix"], AnalyticsPoint);
+	        this.itemVelocity = this.convertValues(source["itemVelocity"], AnalyticsPoint);
+	        this.contributionMargin = this.convertValues(source["contributionMargin"], AnalyticsPoint);
+	        this.inventoryHealth = this.convertValues(source["inventoryHealth"], InventoryHealthRow);
+	        this.kitchenPerformance = this.convertValues(source["kitchenPerformance"], KitchenPerformanceRow);
+	        this.purchaseTrend = this.convertValues(source["purchaseTrend"], AnalyticsPoint);
+	        this.itemMatrix = this.convertValues(source["itemMatrix"], ItemMatrixBucket);
+	        this.settlement = this.convertValues(source["settlement"], SettlementHealth);
+	        this.exceptions = this.convertValues(source["exceptions"], AnalyticsException);
+	        this.recommendations = this.convertValues(source["recommendations"], AnalyticsRecommendation);
+	        this.snapshotStatus = this.convertValues(source["snapshotStatus"], AnalyticsSnapshotStatus);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+
+
+
+
 	export class ApprovalToken {
 	    token: string;
 	    approvedBy: string;
 	    approvedAt: string;
 	    expiresAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ApprovalToken(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.token = source["token"];
@@ -116,11 +421,11 @@ export namespace nexus {
 	    detail: string;
 	    actor: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AuditLogEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -136,11 +441,11 @@ export namespace nexus {
 	    invoiceId: string;
 	    paymentMethod: string;
 	    paymentTendered: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CloseInvoiceInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.invoiceId = source["invoiceId"];
@@ -154,11 +459,11 @@ export namespace nexus {
 	    customerPhone: string;
 	    paymentMethod: string;
 	    paymentTendered: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CloseOrderSessionInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
@@ -176,11 +481,11 @@ export namespace nexus {
 	    visitCount: number;
 	    lastVisitAt: string;
 	    favoriteItem: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Customer(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -199,11 +504,11 @@ export namespace nexus {
 	    caption: string;
 	    status: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MarketingDraft(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -221,11 +526,11 @@ export namespace nexus {
 	    detail: string;
 	    action: string;
 	    priority: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Signal(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -248,11 +553,11 @@ export namespace nexus {
 	    unitCost: number;
 	    rejectionReason: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DeliveryLine(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -275,11 +580,11 @@ export namespace nexus {
 	    status: string;
 	    createdAt: string;
 	    lines: DeliveryLine[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DeliveryBatch(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -289,7 +594,7 @@ export namespace nexus {
 	        this.createdAt = source["createdAt"];
 	        this.lines = this.convertValues(source["lines"], DeliveryLine);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -316,11 +621,11 @@ export namespace nexus {
 	    quantity: number;
 	    notes: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new KitchenTicketLine(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -342,11 +647,11 @@ export namespace nexus {
 	    status: string;
 	    createdAt: string;
 	    lines: KitchenTicketLine[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new KitchenTicket(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -359,7 +664,7 @@ export namespace nexus {
 	        this.createdAt = source["createdAt"];
 	        this.lines = this.convertValues(source["lines"], KitchenTicketLine);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -401,11 +706,11 @@ export namespace nexus {
 	    createdAt: string;
 	    closedAt: string;
 	    kotSentAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SaleSummary(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -441,11 +746,11 @@ export namespace nexus {
 	    purchaseToUsage: number;
 	    quantity: number;
 	    wasteFactorOverride?: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RecipeComponent(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
@@ -463,11 +768,11 @@ export namespace nexus {
 	    itemName: string;
 	    routeName: string;
 	    components: RecipeComponent[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RecipeCard(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
@@ -475,7 +780,7 @@ export namespace nexus {
 	        this.routeName = source["routeName"];
 	        this.components = this.convertValues(source["components"], RecipeComponent);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -499,11 +804,11 @@ export namespace nexus {
 	    name: string;
 	    printerName: string;
 	    color: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new KitchenRoute(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -523,11 +828,11 @@ export namespace nexus {
 	    wasteFactor: number;
 	    lastPurchaseCost: number;
 	    lastAuditAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Ingredient(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -552,11 +857,11 @@ export namespace nexus {
 	    routeId: string;
 	    routeName: string;
 	    taxRate: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -578,11 +883,11 @@ export namespace nexus {
 	    customerCount: number;
 	    averageOrder: number;
 	    openKots: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Metrics(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ordersToday = source["ordersToday"];
@@ -601,11 +906,11 @@ export namespace nexus {
 	    website: string;
 	    brandVoice: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Restaurant(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -629,11 +934,11 @@ export namespace nexus {
 	    deliveries: DeliveryBatch[];
 	    signals: Signal[];
 	    marketingDrafts: MarketingDraft[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Dashboard(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.restaurant = this.convertValues(source["restaurant"], Restaurant);
@@ -649,7 +954,7 @@ export namespace nexus {
 	        this.signals = this.convertValues(source["signals"], Signal);
 	        this.marketingDrafts = this.convertValues(source["marketingDrafts"], MarketingDraft);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -672,11 +977,11 @@ export namespace nexus {
 	    businessDate: string;
 	    cashCounted: number;
 	    notes: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DayCloseInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.businessDate = source["businessDate"];
@@ -700,11 +1005,11 @@ export namespace nexus {
 	    voidCount: number;
 	    discountTotal: number;
 	    notes: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DayCloseSummary(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -724,7 +1029,7 @@ export namespace nexus {
 	        this.notes = source["notes"];
 	    }
 	}
-	
+
 	export class DeliveryLineInput {
 	    ingredientId: string;
 	    orderedQty: number;
@@ -732,11 +1037,11 @@ export namespace nexus {
 	    rejectedQty: number;
 	    unitCost: number;
 	    rejectionReason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DeliveryLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ingredientId = source["ingredientId"];
@@ -751,18 +1056,18 @@ export namespace nexus {
 	    vendorName: string;
 	    invoiceNumber: string;
 	    lines: DeliveryLineInput[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DeliveryInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.vendorName = source["vendorName"];
 	        this.invoiceNumber = source["invoiceNumber"];
 	        this.lines = this.convertValues(source["lines"], DeliveryLineInput);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -781,8 +1086,8 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
-	
+
+
 	export class DiningTable {
 	    id: string;
 	    sectionId: string;
@@ -791,11 +1096,11 @@ export namespace nexus {
 	    seats: number;
 	    status: string;
 	    activeSessionId: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DiningTable(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -813,11 +1118,11 @@ export namespace nexus {
 	    name: string;
 	    seats: number;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DiningTableInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -833,11 +1138,11 @@ export namespace nexus {
 	    fileName: string;
 	    mimeType: string;
 	    bytes: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ExportResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -851,11 +1156,11 @@ export namespace nexus {
 	    id: string;
 	    name: string;
 	    sortOrder: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FloorSection(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -867,11 +1172,11 @@ export namespace nexus {
 	    id: string;
 	    name: string;
 	    sortOrder: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FloorSectionInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -879,7 +1184,7 @@ export namespace nexus {
 	        this.sortOrder = source["sortOrder"];
 	    }
 	}
-	
+
 	export class IngredientInput {
 	    id: string;
 	    name: string;
@@ -890,11 +1195,11 @@ export namespace nexus {
 	    reorderPoint: number;
 	    wasteFactor: number;
 	    lastPurchaseCost: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new IngredientInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -914,11 +1219,11 @@ export namespace nexus {
 	    purchaseUnit: string;
 	    purchaseToUsage: number;
 	    lastPurchaseCost: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new IngredientUpdateInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ingredientId = source["ingredientId"];
@@ -939,11 +1244,11 @@ export namespace nexus {
 	    lastCheckedAt: string;
 	    lastError: string;
 	    updatedAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new IntegrationSetting(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -965,11 +1270,11 @@ export namespace nexus {
 	    baseUrl: string;
 	    secret: string;
 	    healthStatus: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new IntegrationSettingInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
@@ -980,6 +1285,7 @@ export namespace nexus {
 	        this.healthStatus = source["healthStatus"];
 	    }
 	}
+
 	export class NotificationRecord {
 	    id: string;
 	    invoiceId: string;
@@ -992,11 +1298,11 @@ export namespace nexus {
 	    createdAt: string;
 	    sentAt: string;
 	    readAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new NotificationRecord(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1020,11 +1326,11 @@ export namespace nexus {
 	    detail: string;
 	    actor: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new InvoiceEvent(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1044,11 +1350,11 @@ export namespace nexus {
 	    approvedBy: string;
 	    approvedAt: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RefundRecord(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1069,11 +1375,11 @@ export namespace nexus {
 	    changeDue: number;
 	    status: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PaymentRecord(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1097,11 +1403,11 @@ export namespace nexus {
 	    notes: string;
 	    routeId: string;
 	    routeName: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new InvoiceLine(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1124,11 +1430,11 @@ export namespace nexus {
 	    events: InvoiceEvent[];
 	    kitchenTickets: KitchenTicket[];
 	    notifications: NotificationRecord[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new InvoiceDetail(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.summary = this.convertValues(source["summary"], SaleSummary);
@@ -1139,7 +1445,7 @@ export namespace nexus {
 	        this.kitchenTickets = this.convertValues(source["kitchenTickets"], KitchenTicket);
 	        this.notifications = this.convertValues(source["notifications"], NotificationRecord);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1158,18 +1464,18 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
+
 	export class InvoiceFilter {
 	    status: string;
 	    search: string;
 	    paymentMethod: string;
 	    dateFrom: string;
 	    dateTo: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new InvoiceFilter(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.status = source["status"];
@@ -1179,21 +1485,24 @@ export namespace nexus {
 	        this.dateTo = source["dateTo"];
 	    }
 	}
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
 	export class MenuCategory {
 	    id: string;
 	    name: string;
 	    sortOrder: number;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuCategory(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1207,11 +1516,11 @@ export namespace nexus {
 	    name: string;
 	    sortOrder: number;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuCategoryInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1222,11 +1531,11 @@ export namespace nexus {
 	}
 	export class MenuImportInput {
 	    text: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuImportInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.text = source["text"];
@@ -1236,11 +1545,11 @@ export namespace nexus {
 	    imported: number;
 	    updated: number;
 	    skipped: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuImportResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.imported = source["imported"];
@@ -1248,7 +1557,7 @@ export namespace nexus {
 	        this.skipped = source["skipped"];
 	    }
 	}
-	
+
 	export class MenuItemInput {
 	    id: string;
 	    name: string;
@@ -1258,11 +1567,11 @@ export namespace nexus {
 	    status: string;
 	    routeId: string;
 	    taxRate: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuItemInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1278,11 +1587,11 @@ export namespace nexus {
 	export class MenuItemModifier {
 	    itemId: string;
 	    modifierId: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuItemModifier(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
@@ -1295,11 +1604,11 @@ export namespace nexus {
 	    priceDelta: number;
 	    routeId: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuModifier(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1315,11 +1624,11 @@ export namespace nexus {
 	    priceDelta: number;
 	    routeId: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MenuModifierInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1329,18 +1638,18 @@ export namespace nexus {
 	        this.status = source["status"];
 	    }
 	}
-	
-	
+
+
 	export class OpenOrderSessionInput {
 	    tableId: string;
 	    waiterId: string;
 	    guestCount: number;
 	    serviceMode: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OpenOrderSessionInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tableId = source["tableId"];
@@ -1371,11 +1680,11 @@ export namespace nexus {
 	    preparingLineCount: number;
 	    queuedLineCount: number;
 	    notSentLineCount: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OrderSession(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1408,11 +1717,11 @@ export namespace nexus {
 	    detail: string;
 	    actor: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OrderSessionEvent(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1437,11 +1746,11 @@ export namespace nexus {
 	    kotStatus: string;
 	    modifierIds: string[];
 	    modifierNames: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OrderSessionLine(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1463,18 +1772,18 @@ export namespace nexus {
 	    session: OrderSession;
 	    lines: OrderSessionLine[];
 	    events: OrderSessionEvent[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OrderSessionDetail(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.session = this.convertValues(source["session"], OrderSession);
 	        this.lines = this.convertValues(source["lines"], OrderSessionLine);
 	        this.events = this.convertValues(source["events"], OrderSessionEvent);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1493,9 +1802,9 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
-	
-	
+
+
+
 	export class PaymentRequest {
 	    id: string;
 	    invoiceId: string;
@@ -1508,11 +1817,11 @@ export namespace nexus {
 	    qrPayload: string;
 	    createdAt: string;
 	    updatedAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PaymentRequest(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1537,11 +1846,11 @@ export namespace nexus {
 	    reason: string;
 	    status: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new VendorDebitNote(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1564,11 +1873,11 @@ export namespace nexus {
 	    rejectedQty: number;
 	    unitCost: number;
 	    rejectionReason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PurchaseOrderLine(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1593,11 +1902,11 @@ export namespace nexus {
 	    rejectedTotal: number;
 	    createdAt: string;
 	    lines: PurchaseOrderLine[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PurchaseOrder(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1611,7 +1920,7 @@ export namespace nexus {
 	        this.createdAt = source["createdAt"];
 	        this.lines = this.convertValues(source["lines"], PurchaseOrderLine);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1638,11 +1947,11 @@ export namespace nexus {
 	    paymentTerms: string;
 	    qualityScore: number;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Vendor(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1666,11 +1975,11 @@ export namespace nexus {
 	    lastError: string;
 	    createdAt: string;
 	    printedAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PrintJob(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1693,11 +2002,11 @@ export namespace nexus {
 	    pinHash: string;
 	    status: string;
 	    createdAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StaffMember(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1723,11 +2032,11 @@ export namespace nexus {
 	    backupPath: string;
 	    receiptPrinterId: string;
 	    updatedAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RestaurantSettings(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1764,11 +2073,11 @@ export namespace nexus {
 	    dayClose: DayCloseSummary;
 	    accounting: AccountingSnapshot;
 	    auditLog: AuditLogEntry[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PilotWorkspace(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.settings = this.convertValues(source["settings"], RestaurantSettings);
@@ -1789,7 +2098,7 @@ export namespace nexus {
 	        this.accounting = this.convertValues(source["accounting"], AccountingSnapshot);
 	        this.auditLog = this.convertValues(source["auditLog"], AuditLogEntry);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1808,16 +2117,16 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
+
 	export class PrinterConnectionInput {
 	    target: string;
 	    displayName: string;
 	    mode: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PrinterConnectionInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.target = source["target"];
@@ -1825,16 +2134,16 @@ export namespace nexus {
 	        this.mode = source["mode"];
 	    }
 	}
-	
+
 	export class PurchaseOrderLineInput {
 	    ingredientId: string;
 	    orderedQty: number;
 	    unitCost: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PurchaseOrderLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ingredientId = source["ingredientId"];
@@ -1846,18 +2155,18 @@ export namespace nexus {
 	    vendorId: string;
 	    expectedDate: string;
 	    lines: PurchaseOrderLineInput[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PurchaseOrderInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.vendorId = source["vendorId"];
 	        this.expectedDate = source["expectedDate"];
 	        this.lines = this.convertValues(source["lines"], PurchaseOrderLineInput);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1876,18 +2185,18 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
-	
+
+
 	export class ReceivePurchaseOrderLineInput {
 	    lineId: string;
 	    acceptedQty: number;
 	    rejectedQty: number;
 	    rejectionReason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ReceivePurchaseOrderLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.lineId = source["lineId"];
@@ -1899,17 +2208,17 @@ export namespace nexus {
 	export class ReceivePurchaseOrderInput {
 	    purchaseOrderId: string;
 	    lines: ReceivePurchaseOrderLineInput[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ReceivePurchaseOrderInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.purchaseOrderId = source["purchaseOrderId"];
 	        this.lines = this.convertValues(source["lines"], ReceivePurchaseOrderLineInput);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1928,18 +2237,18 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
-	
-	
+
+
+
 	export class RecipeLineUpdateInput {
 	    ingredientId: string;
 	    quantity: number;
 	    wasteFactorOverride?: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RecipeLineUpdateInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ingredientId = source["ingredientId"];
@@ -1950,17 +2259,17 @@ export namespace nexus {
 	export class RecipeUpdateInput {
 	    itemId: string;
 	    components: RecipeLineUpdateInput[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RecipeUpdateInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
 	        this.components = this.convertValues(source["components"], RecipeLineUpdateInput);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1983,11 +2292,11 @@ export namespace nexus {
 	    ingredientId: string;
 	    physicalQty: number;
 	    note: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ReconcileInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ingredientId = source["ingredientId"];
@@ -2000,11 +2309,11 @@ export namespace nexus {
 	    pin: string;
 	    amount: number;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RefundInvoiceInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.invoiceId = source["invoiceId"];
@@ -2013,18 +2322,18 @@ export namespace nexus {
 	        this.reason = source["reason"];
 	    }
 	}
-	
-	
-	
+
+
+
 	export class SaleLineInput {
 	    itemId: string;
 	    quantity: number;
 	    notes: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SaleLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
@@ -2044,11 +2353,11 @@ export namespace nexus {
 	    paymentMethod: string;
 	    paymentTendered: number;
 	    lines: SaleLineInput[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SaleInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.customerName = source["customerName"];
@@ -2063,7 +2372,7 @@ export namespace nexus {
 	        this.paymentTendered = source["paymentTendered"];
 	        this.lines = this.convertValues(source["lines"], SaleLineInput);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2082,17 +2391,18 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
-	
-	
+
+
+
+
 	export class SplitLineInput {
 	    lineId: string;
 	    quantity: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SplitLineInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.lineId = source["lineId"];
@@ -2104,11 +2414,11 @@ export namespace nexus {
 	    mode: string;
 	    lines: SplitLineInput[];
 	    amounts: number[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SplitInvoiceInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.invoiceId = source["invoiceId"];
@@ -2116,7 +2426,7 @@ export namespace nexus {
 	        this.lines = this.convertValues(source["lines"], SplitLineInput);
 	        this.amounts = source["amounts"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2135,18 +2445,18 @@ export namespace nexus {
 		    return a;
 		}
 	}
-	
+
 	export class StaffInput {
 	    id: string;
 	    name: string;
 	    role: string;
 	    pin: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StaffInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2156,23 +2466,23 @@ export namespace nexus {
 	        this.status = source["status"];
 	    }
 	}
-	
+
 	export class TableMoveInput {
 	    sessionId: string;
 	    targetTableId: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new TableMoveInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
 	        this.targetTableId = source["targetTableId"];
 	    }
 	}
-	
-	
+
+
 	export class VendorInput {
 	    id: string;
 	    name: string;
@@ -2180,11 +2490,11 @@ export namespace nexus {
 	    gstin: string;
 	    paymentTerms: string;
 	    status: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new VendorInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2199,11 +2509,11 @@ export namespace nexus {
 	    invoiceId: string;
 	    pin: string;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new VoidInvoiceInput(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.invoiceId = source["invoiceId"];

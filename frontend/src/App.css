@@ -112,6 +112,46 @@
     font-size: 12px;
 }
 
+.workspace-switcher {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.workspace-switcher button {
+    display: grid;
+    min-height: 74px;
+    align-content: start;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #d8dedc;
+    padding: 10px;
+    text-align: left;
+}
+
+.workspace-switcher button.active {
+    border-color: rgba(155, 227, 207, 0.42);
+    background: rgba(155, 227, 207, 0.12);
+    color: #fff;
+}
+
+.workspace-switcher strong,
+.workspace-switcher span {
+    display: block;
+}
+
+.workspace-switcher strong {
+    margin-bottom: 7px;
+    color: #9be3cf;
+    font-size: 12px;
+}
+
+.workspace-switcher span {
+    color: inherit;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
 .nav-list {
     display: grid;
     gap: 14px;
@@ -198,6 +238,12 @@ textarea {
     font-size: 25px;
     font-weight: 760;
     line-height: 1.1;
+}
+
+.topbar p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
 }
 
 .topbar-actions,
@@ -1480,13 +1526,505 @@ textarea:focus {
     border-left-color: var(--red);
 }
 
+.workspace-kitchenOps .workspace {
+    padding: 18px;
+}
+
+.kds-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 14px;
+    align-items: start;
+}
+
+.kds-command {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) repeat(3, 128px);
+    gap: 10px;
+    align-items: stretch;
+}
+
+.station-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.kds-stat,
+.admin-metric {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 13px;
+}
+
+.kds-stat span,
+.kds-stat strong,
+.admin-metric span,
+.admin-metric strong,
+.admin-metric em {
+    display: block;
+}
+
+.kds-stat span,
+.admin-metric span,
+.admin-metric em {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.kds-stat strong {
+    margin-top: 6px;
+    font-size: 26px;
+}
+
+.kds-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.kds-ticket {
+    display: grid;
+    gap: 14px;
+    min-height: 300px;
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--blue);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 16px;
+}
+
+.kds-ticket.ready {
+    border-top-color: var(--green);
+}
+
+.kds-ticket.served {
+    opacity: 0.72;
+}
+
+.kds-ticket.age-warn {
+    box-shadow: inset 0 0 0 2px rgba(183, 121, 31, 0.22);
+}
+
+.kds-ticket.age-hot {
+    box-shadow: inset 0 0 0 2px rgba(207, 79, 63, 0.28);
+}
+
+.kds-ticket-head,
+.kds-actions,
+.station-health,
+.inventory-risk {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.kds-ticket-head strong {
+    display: block;
+    font-size: 24px;
+}
+
+.kds-ticket-head span,
+.kds-ticket-head em,
+.kds-lines span,
+.station-health span,
+.inventory-risk span {
+    color: var(--muted);
+    font-size: 12px;
+    font-style: normal;
+}
+
+.kds-ticket-head em {
+    display: block;
+    margin-top: 8px;
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 820;
+    text-align: right;
+}
+
+.kds-lines {
+    display: grid;
+    gap: 10px;
+}
+
+.kds-lines div {
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--surface-soft);
+    padding: 11px;
+}
+
+.kds-lines strong,
+.kds-lines span {
+    display: block;
+}
+
+.kds-actions {
+    align-self: end;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.kds-actions button {
+    min-height: 42px;
+    min-width: 94px;
+}
+
+.kds-side {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-command {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #ffffff 0%, #f5faf7 100%);
+    padding: 20px;
+}
+
+.admin-hero h2 {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.1;
+}
+
+.admin-hero p {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: var(--muted);
+}
+
+.admin-hero-actions {
+    display: grid;
+    gap: 10px;
+    min-width: 330px;
+}
+
+.admin-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.admin-metric {
+    border-top: 3px solid var(--ink);
+}
+
+.admin-metric.green {
+    border-top-color: var(--green);
+}
+
+.admin-metric.gold {
+    border-top-color: var(--gold);
+}
+
+.admin-metric.coral {
+    border-top-color: var(--coral);
+}
+
+.admin-metric.blue {
+    border-top-color: var(--blue);
+}
+
+.admin-metric strong {
+    margin: 8px 0 6px;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+}
+
+.admin-grid .panel:nth-child(11),
+.admin-grid .panel:nth-child(12) {
+    grid-column: span 2;
+}
+
+.line-chart {
+    display: grid;
+    gap: 10px;
+    color: var(--green);
+}
+
+.line-chart svg {
+    width: 100%;
+    min-height: 210px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, #fbfdfb, #f5f7f2);
+    overflow: visible;
+}
+
+.line-chart circle {
+    fill: var(--surface);
+    stroke: currentColor;
+    stroke-width: 3px;
+}
+
+.chart-label-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+    gap: 8px;
+}
+
+.chart-label-row span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.chart-label-row strong {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink);
+}
+
+.bar-list {
+    display: grid;
+    gap: 10px;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: minmax(118px, 0.9fr) minmax(120px, 1.2fr) minmax(74px, auto);
+    gap: 10px;
+    align-items: center;
+}
+
+.bar-row span {
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.bar-row i {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e6ebe5;
+}
+
+.bar-row b {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--green);
+}
+
+.bar-row.blue b {
+    background: var(--blue);
+}
+
+.bar-row.gold b {
+    background: var(--gold);
+}
+
+.bar-row.coral b {
+    background: var(--coral);
+}
+
+.bar-row strong {
+    font-size: 12px;
+    text-align: right;
+}
+
+.heatmap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+.heatmap div {
+    min-height: 92px;
+    border: 1px solid rgba(31, 138, 112, calc(0.12 + var(--heat) * 0.35));
+    border-radius: var(--radius);
+    background: rgba(31, 138, 112, calc(0.08 + var(--heat) * 0.24));
+    padding: 10px;
+}
+
+.heatmap strong,
+.heatmap span,
+.heatmap em {
+    display: block;
+}
+
+.heatmap span {
+    margin: 8px 0 4px;
+    font-weight: 800;
+}
+
+.heatmap em {
+    color: var(--muted);
+    font-size: 11px;
+    font-style: normal;
+}
+
+.station-health-list,
+.inventory-risk-list,
+.recommendation-list,
+.exception-list {
+    display: grid;
+    gap: 9px;
+}
+
+.station-health,
+.inventory-risk,
+.recommendation-card,
+.exception-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+    padding: 11px;
+}
+
+.station-health strong,
+.station-health span,
+.inventory-risk strong,
+.inventory-risk span,
+.recommendation-card strong,
+.recommendation-card span,
+.exception-card strong,
+.exception-card span {
+    display: block;
+}
+
+.station-health em,
+.inventory-risk em {
+    color: var(--brand);
+    font-style: normal;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.inventory-risk.critical {
+    border-left: 4px solid var(--red);
+}
+
+.inventory-risk.watch {
+    border-left: 4px solid var(--gold);
+}
+
+.settlement-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.matrix-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.matrix-bucket {
+    display: grid;
+    gap: 9px;
+    min-height: 230px;
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--blue);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+    padding: 12px;
+}
+
+.matrix-bucket.stars {
+    border-top-color: var(--green);
+}
+
+.matrix-bucket.premium_sleepers {
+    border-top-color: var(--gold);
+}
+
+.matrix-bucket.traffic_drivers {
+    border-top-color: var(--blue);
+}
+
+.matrix-bucket.rework {
+    border-top-color: var(--coral);
+}
+
+.matrix-bucket > span,
+.recommendation-card span,
+.exception-card span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.matrix-bucket > div {
+    display: grid;
+    gap: 7px;
+}
+
+.matrix-bucket button {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    text-align: left;
+}
+
+.matrix-bucket button span {
+    min-width: 0;
+}
+
+.matrix-bucket button em {
+    color: var(--muted);
+    font-size: 11px;
+    font-style: normal;
+    white-space: nowrap;
+}
+
+.recommendation-card {
+    display: grid;
+    gap: 8px;
+}
+
+.recommendation-card p,
+.exception-card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.exception-card {
+    border-left: 4px solid var(--blue);
+}
+
+.exception-card.high {
+    border-left-color: var(--red);
+}
+
+.exception-card.medium {
+    border-left-color: var(--gold);
+}
+
 @media (max-width: 860px) {
     .app-shell,
     .counter-grid,
     .floor-workspace,
     .home-grid,
     .invoice-layout,
-    .page-grid.two {
+    .page-grid.two,
+    .kds-layout,
+    .admin-grid {
         grid-template-columns: 1fr;
     }
 
@@ -1498,6 +2036,22 @@ textarea:focus {
         position: static;
         height: auto;
     }
+
+    .kds-command,
+    .admin-metric-grid,
+    .admin-hero,
+    .admin-hero-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-hero {
+        display: grid;
+    }
+
+    .admin-grid .panel:nth-child(11),
+    .admin-grid .panel:nth-child(12) {
+        grid-column: auto;
+    }
 }
 
 @media (max-width: 760px) {
@@ -1506,6 +2060,11 @@ textarea:focus {
     }
 
     .metric-grid,
+    .workspace-switcher,
+    .kds-command,
+    .admin-metric-grid,
+    .matrix-grid,
+    .bar-row,
     .table-map,
     .live-table-grid,
     .po-draft-line,

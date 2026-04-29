@@ -499,6 +499,42 @@ CREATE TABLE IF NOT EXISTS accounting_voucher_lines (
 	sort_order INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS analytics_daily_snapshots (
+	business_date TEXT PRIMARY KEY,
+	sales_total REAL NOT NULL DEFAULT 0,
+	order_count INTEGER NOT NULL DEFAULT 0,
+	refund_total REAL NOT NULL DEFAULT 0,
+	void_count INTEGER NOT NULL DEFAULT 0,
+	discount_total REAL NOT NULL DEFAULT 0,
+	cash_total REAL NOT NULL DEFAULT 0,
+	upi_total REAL NOT NULL DEFAULT 0,
+	card_total REAL NOT NULL DEFAULT 0,
+	razorpay_total REAL NOT NULL DEFAULT 0,
+	updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS analytics_item_snapshots (
+	business_date TEXT NOT NULL,
+	item_id TEXT NOT NULL,
+	item_name TEXT NOT NULL,
+	category TEXT NOT NULL,
+	quantity INTEGER NOT NULL DEFAULT 0,
+	gross_sales REAL NOT NULL DEFAULT 0,
+	cost_total REAL NOT NULL DEFAULT 0,
+	margin REAL NOT NULL DEFAULT 0,
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (business_date, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS analytics_hourly_snapshots (
+	business_date TEXT NOT NULL,
+	hour INTEGER NOT NULL,
+	sales_total REAL NOT NULL DEFAULT 0,
+	order_count INTEGER NOT NULL DEFAULT 0,
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (business_date, hour)
+);
+
 CREATE TABLE IF NOT EXISTS sync_log (
 	id TEXT PRIMARY KEY,
 	entity TEXT NOT NULL,

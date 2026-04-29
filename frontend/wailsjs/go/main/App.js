@@ -50,6 +50,10 @@ export function GetAccountingSnapshot() {
   return window['go']['main']['App']['GetAccountingSnapshot']();
 }
 
+export function GetAdminAnalytics(arg1) {
+  return window['go']['main']['App']['GetAdminAnalytics'](arg1);
+}
+
 export function GetAuditLog(arg1) {
   return window['go']['main']['App']['GetAuditLog'](arg1);
 }

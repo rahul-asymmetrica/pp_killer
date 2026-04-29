@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState, type ReactNode} from 'react';
+import {useEffect, useMemo, useState, type CSSProperties, type ReactNode} from 'react';
 import './App.css';
 import {
     AddOrderSessionLine,
@@ -12,6 +12,7 @@ import {
     ExportDayClosePDF,
     ExportInvoicePDF,
     ExportInvoicesCSV,
+    GetAdminAnalytics,
     GetDashboard,
     GetPilotWorkspace,
     GetInvoiceDetail,
@@ -57,7 +58,8 @@ import {
 import {nexus} from '../wailsjs/go/models';
 import {WindowFullscreen} from '../wailsjs/runtime/runtime';
 
-type PageKey = 'home' | 'counter' | 'floor' | 'orders' | 'invoices' | 'kitchen' | 'inventory' | 'vendors' | 'recipes' | 'customers' | 'marketing' | 'integrations' | 'dayclose' | 'accounting' | 'settings';
+type WorkspaceKey = 'front' | 'kitchenOps' | 'backoffice' | 'admin';
+type PageKey = 'home' | 'counter' | 'floor' | 'orders' | 'invoices' | 'kitchen' | 'inventory' | 'vendors' | 'recipes' | 'customers' | 'marketing' | 'integrations' | 'dayclose' | 'accounting' | 'settings' | 'admin';
 type ToastKind = 'success' | 'error' | 'info';
 
 type Metrics = {
@@ -284,6 +286,7 @@ type KitchenTicket = {
     ticketNumber: string;
     routeName: string;
     status: string;
+    createdAt: string;
     lines: KitchenTicketLine[];
 };
 
@@ -577,6 +580,116 @@ type PilotWorkspace = {
     auditLog: AuditLogEntry[];
 };
 
+type AnalyticsMetric = {
+    id: string;
+    label: string;
+    value: number;
+    format: string;
+    detail: string;
+    tone: string;
+};
+
+type AnalyticsPoint = {
+    label: string;
+    value: number;
+    count: number;
+    tone: string;
+};
+
+type InventoryHealthRow = {
+    id: string;
+    name: string;
+    onHandQty: number;
+    reorderPoint: number;
+    unit: string;
+    riskScore: number;
+    status: string;
+};
+
+type KitchenPerformanceRow = {
+    routeName: string;
+    openTickets: number;
+    readyTickets: number;
+    servedTickets: number;
+    averageAgeMin: number;
+    oldestAgeMin: number;
+};
+
+type ItemMatrixEntry = {
+    itemId: string;
+    name: string;
+    category: string;
+    quantity: number;
+    sales: number;
+    margin: number;
+    marginPct: number;
+};
+
+type ItemMatrixBucket = {
+    id: string;
+    label: string;
+    description: string;
+    items: ItemMatrixEntry[];
+};
+
+type SettlementHealth = {
+    cashExpected: number;
+    cashVariance: number;
+    upiTotal: number;
+    cardTotal: number;
+    razorpayTotal: number;
+    razorpayClearing: number;
+    taxPayable: number;
+    vendorPayables: number;
+    refundTotal: number;
+};
+
+type AnalyticsException = {
+    id: string;
+    kind: string;
+    title: string;
+    detail: string;
+    severity: string;
+    value: number;
+};
+
+type AnalyticsRecommendation = {
+    id: string;
+    title: string;
+    detail: string;
+    priority: number;
+    page: PageKey;
+};
+
+type AnalyticsSnapshotStatus = {
+    dailyRows: number;
+    itemRows: number;
+    hourlyRows: number;
+    updatedAt: string;
+};
+
+type AdminAnalytics = {
+    generatedAt: string;
+    rangeKey: string;
+    rangeLabel: string;
+    demoFallback: boolean;
+    executive: AnalyticsMetric[];
+    salesTrend: AnalyticsPoint[];
+    hourlyHeatmap: AnalyticsPoint[];
+    tenderMix: AnalyticsPoint[];
+    categoryMix: AnalyticsPoint[];
+    itemVelocity: AnalyticsPoint[];
+    contributionMargin: AnalyticsPoint[];
+    inventoryHealth: InventoryHealthRow[];
+    kitchenPerformance: KitchenPerformanceRow[];
+    purchaseTrend: AnalyticsPoint[];
+    itemMatrix: ItemMatrixBucket[];
+    settlement: SettlementHealth;
+    exceptions: AnalyticsException[];
+    recommendations: AnalyticsRecommendation[];
+    snapshotStatus: AnalyticsSnapshotStatus;
+};
+
 type CartLine = {
     itemId: string;
     quantity: number;
@@ -660,22 +773,30 @@ type ReadinessItem = {
     page: PageKey;
 };
 
-const pages: Array<{key: PageKey; label: string; group: string}> = [
-    {key: 'home', label: 'Today', group: 'Start'},
-    {key: 'counter', label: 'Quick Bill', group: 'Sell'},
-    {key: 'floor', label: 'Tables', group: 'Sell'},
-    {key: 'orders', label: 'Open Bills', group: 'Sell'},
-    {key: 'kitchen', label: 'Kitchen', group: 'Service'},
-    {key: 'invoices', label: 'Receipts', group: 'Money'},
-    {key: 'dayclose', label: 'Close Day', group: 'Money'},
-    {key: 'accounting', label: 'Reports', group: 'Money'},
-    {key: 'inventory', label: 'Stock', group: 'Back Office'},
-    {key: 'vendors', label: 'Purchases', group: 'Back Office'},
-    {key: 'recipes', label: 'Menu Setup', group: 'Back Office'},
-    {key: 'customers', label: 'Customers', group: 'Growth'},
-    {key: 'marketing', label: 'Marketing', group: 'Growth'},
-    {key: 'integrations', label: 'Devices', group: 'Setup'},
-    {key: 'settings', label: 'Settings', group: 'Setup'},
+const workspaces: Array<{key: WorkspaceKey; label: string; short: string; detail: string; defaultPage: PageKey}> = [
+    {key: 'front', label: 'Front of House', short: 'FOH', detail: 'Tables, counter, bills', defaultPage: 'home'},
+    {key: 'kitchenOps', label: 'Kitchen', short: 'KDS', detail: 'Station queue', defaultPage: 'kitchen'},
+    {key: 'backoffice', label: 'Back Office', short: 'BO', detail: 'Menu, stock, devices', defaultPage: 'inventory'},
+    {key: 'admin', label: 'Admin Command', short: 'ADM', detail: 'Business health', defaultPage: 'admin'},
+];
+
+const pages: Array<{key: PageKey; label: string; group: string; workspaces: WorkspaceKey[]}> = [
+    {key: 'home', label: 'Today', group: 'Floor', workspaces: ['front']},
+    {key: 'counter', label: 'Quick Bill', group: 'Floor', workspaces: ['front']},
+    {key: 'floor', label: 'Tables', group: 'Floor', workspaces: ['front']},
+    {key: 'orders', label: 'Open Bills', group: 'Floor', workspaces: ['front']},
+    {key: 'invoices', label: 'Receipts', group: 'Money', workspaces: ['front', 'admin']},
+    {key: 'kitchen', label: 'Kitchen Display', group: 'Production', workspaces: ['kitchenOps']},
+    {key: 'admin', label: 'Command Center', group: 'Executive', workspaces: ['admin']},
+    {key: 'dayclose', label: 'Close Day', group: 'Executive', workspaces: ['admin']},
+    {key: 'accounting', label: 'Reports', group: 'Executive', workspaces: ['admin']},
+    {key: 'inventory', label: 'Stock', group: 'Operations', workspaces: ['backoffice']},
+    {key: 'vendors', label: 'Purchases', group: 'Operations', workspaces: ['backoffice']},
+    {key: 'recipes', label: 'Menu Setup', group: 'Operations', workspaces: ['backoffice']},
+    {key: 'customers', label: 'Customers', group: 'Growth', workspaces: ['backoffice']},
+    {key: 'marketing', label: 'Marketing', group: 'Growth', workspaces: ['backoffice']},
+    {key: 'integrations', label: 'Devices', group: 'Systems', workspaces: ['backoffice']},
+    {key: 'settings', label: 'Settings', group: 'Systems', workspaces: ['backoffice', 'admin']},
 ];
 
 const currency = new Intl.NumberFormat('en-IN', {
@@ -688,9 +809,9 @@ const compactNumber = new Intl.NumberFormat('en-IN', {
     maximumFractionDigits: 1,
 });
 
-function groupedPages() {
+function groupedPages(workspace: WorkspaceKey) {
     const groups: Array<[string, typeof pages]> = [];
-    for (const page of pages) {
+    for (const page of pages.filter((item) => item.workspaces.includes(workspace))) {
         const last = groups[groups.length - 1];
         if (last && last[0] === page.group) {
             last[1].push(page);
@@ -704,11 +825,14 @@ function groupedPages() {
 function App() {
     const [dashboard, setDashboard] = useState<Dashboard | null>(null);
     const [pilot, setPilot] = useState<PilotWorkspace | null>(null);
+    const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
     const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetail | null>(null);
     const [selectedSession, setSelectedSession] = useState<OrderSessionDetail | null>(null);
+    const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>('front');
     const [activePage, setActivePage] = useState<PageKey>('home');
+    const [analyticsRange, setAnalyticsRange] = useState('30d');
     const [busy, setBusy] = useState('');
     const [error, setError] = useState('');
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -798,6 +922,10 @@ function App() {
     useEffect(() => {
         void refreshAll();
     }, []);
+
+    useEffect(() => {
+        void refreshAnalytics();
+    }, [analyticsRange]);
 
     useEffect(() => {
         void refreshInvoices();
@@ -914,6 +1042,7 @@ function App() {
     const closedInvoices = useMemo(() => invoices.filter((invoice) => ['closed', 'partially_refunded', 'refunded', 'voided', 'split'].includes(invoice.status)), [invoices]);
     const topSignals = useMemo(() => [...(dashboard?.signals ?? [])].sort((a, b) => a.priority - b.priority).slice(0, 4), [dashboard]);
     const currentPage = useMemo(() => pages.find((page) => page.key === activePage) ?? pages[0], [activePage]);
+    const currentWorkspace = useMemo(() => workspaces.find((workspace) => workspace.key === activeWorkspace) ?? workspaces[0], [activeWorkspace]);
 
     const cartTotals = useMemo(() => {
         const subtotal = cart.reduce((sum, line) => {
@@ -939,13 +1068,15 @@ function App() {
     async function refreshAll() {
         setError('');
         try {
-            const [nextDashboard, nextNotifications, nextPilot] = await Promise.all([
+            const [nextDashboard, nextNotifications, nextPilot, nextAnalytics] = await Promise.all([
                 GetDashboard(),
                 GetNotifications(),
                 GetPilotWorkspace(),
+                GetAdminAnalytics(analyticsRange),
             ]);
             setDashboard(normalizeDashboard(nextDashboard as Dashboard));
             setNotifications(nextNotifications as NotificationRecord[] ?? []);
+            setAnalytics(normalizeAdminAnalytics(nextAnalytics as AdminAnalytics));
             const normalizedPilot = normalizePilotWorkspace(nextPilot as PilotWorkspace);
             setPilot(normalizedPilot);
             setSettingsDraft(normalizedPilot.settings);
@@ -962,6 +1093,16 @@ function App() {
             if (selectedInvoice?.summary.id) {
                 await openInvoice(selectedInvoice.summary.id, false);
             }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
+        }
+    }
+
+    async function refreshAnalytics() {
+        try {
+            const next = await GetAdminAnalytics(analyticsRange);
+            setAnalytics(normalizeAdminAnalytics(next as AdminAnalytics));
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             setError(message);
@@ -1004,6 +1145,19 @@ function App() {
         window.setTimeout(() => {
             setToasts((current) => current.filter((toast) => toast.id !== id));
         }, 4200);
+    }
+
+    function switchWorkspace(workspaceKey: WorkspaceKey) {
+        const workspace = workspaces.find((item) => item.key === workspaceKey) ?? workspaces[0];
+        setActiveWorkspace(workspace.key);
+        setActivePage(workspace.defaultPage);
+    }
+
+    function navigateToPage(pageKey: PageKey) {
+        const page = pages.find((item) => item.key === pageKey);
+        const workspace = page?.workspaces.includes(activeWorkspace) ? activeWorkspace : page?.workspaces[0];
+        if (workspace) setActiveWorkspace(workspace);
+        setActivePage(pageKey);
     }
 
     function orderInput() {
@@ -1654,7 +1808,7 @@ function App() {
     }
 
     return (
-        <main className="app-shell">
+        <main className={`app-shell workspace-${activeWorkspace}`}>
             <aside className="sidebar">
                 <div className="brand-lockup">
                     <div className="brand-mark">NX</div>
@@ -1664,8 +1818,22 @@ function App() {
                     </div>
                 </div>
 
+                <div className="workspace-switcher" aria-label="Role workspace">
+                    {workspaces.map((workspace) => (
+                        <button
+                            type="button"
+                            className={activeWorkspace === workspace.key ? 'active' : ''}
+                            key={workspace.key}
+                            onClick={() => switchWorkspace(workspace.key)}
+                        >
+                            <strong>{workspace.short}</strong>
+                            <span>{workspace.label}</span>
+                        </button>
+                    ))}
+                </div>
+
                 <nav className="nav-list" aria-label="Workspace">
-                    {groupedPages().map(([group, groupPages]) => (
+                    {groupedPages(activeWorkspace).map(([group, groupPages]) => (
                         <div className="nav-group" key={group}>
                             <span>{group}</span>
                             {groupPages.map((page) => (
@@ -1692,8 +1860,9 @@ function App() {
             <section className="workspace">
                 <header className="topbar">
                     <div>
-                        <span className="eyebrow">{dashboard.restaurant.name}</span>
+                        <span className="eyebrow">{currentWorkspace.label} / {dashboard.restaurant.name}</span>
                         <h1>{currentPage.label}</h1>
+                        <p>{currentWorkspace.detail}</p>
                     </div>
                     <div className="topbar-actions">
                         <button className="ghost-button" type="button" onClick={() => WindowFullscreen()}>Full Screen</button>
@@ -1704,12 +1873,12 @@ function App() {
                 {error && <div className="error-strip">{error}</div>}
                 <ToastStack toasts={toasts}/>
 
-                <section className="metric-grid" aria-label="Today">
+                {activeWorkspace !== 'kitchenOps' && activePage !== 'admin' && <section className="metric-grid" aria-label="Today">
                     <Metric label="Sales" value={currency.format(dashboard.metrics.salesToday)} tone="ink"/>
                     <Metric label="Orders" value={String(dashboard.metrics.ordersToday)} tone="green"/>
                     <Metric label="Avg Bill" value={currency.format(dashboard.metrics.averageOrder)} tone="gold"/>
                     <Metric label="KOTs" value={String(dashboard.metrics.openKots)} tone="coral"/>
-                </section>
+                </section>}
 
                 {activePage === 'home' && (
                     <HomePage
@@ -1717,7 +1886,7 @@ function App() {
                         pilot={pilot}
                         invoices={invoices}
                         notifications={notifications}
-                        onNavigate={setActivePage}
+                        onNavigate={navigateToPage}
                     />
                 )}
 
@@ -1824,6 +1993,18 @@ function App() {
                 )}
 
                 {activePage === 'kitchen' && <KitchenPage tickets={dashboard.kitchenTickets} printJobs={pilot.printJobs} onUpdateTicket={updateTicket} onQueuePrint={queuePrint}/>}
+
+                {activePage === 'admin' && (
+                    <AdminCommandCenter
+                        analytics={analytics}
+                        dashboard={dashboard}
+                        pilot={pilot}
+                        range={analyticsRange}
+                        onRange={setAnalyticsRange}
+                        onRefresh={refreshAnalytics}
+                        onNavigate={navigateToPage}
+                    />
+                )}
 
                 {activePage === 'inventory' && (
                     <InventoryPage
@@ -2758,34 +2939,92 @@ function KitchenPage({tickets, printJobs, onUpdateTicket, onQueuePrint}: {
     onUpdateTicket: (ticketID: string, status: string) => void;
     onQueuePrint: (kind: string, referenceID: string) => void;
 }) {
+    const [station, setStation] = useState('all');
+    const stations = ['all', ...Array.from(new Set(tickets.map((ticket) => ticket.routeName || 'Kitchen')))];
+    const visibleTickets = tickets.filter((ticket) => station === 'all' || ticket.routeName === station);
+    const activeTickets = visibleTickets.filter((ticket) => ticket.status !== 'served');
+    const allDayCounts = new Map<string, number>();
+    visibleTickets.forEach((ticket) => {
+        ticket.lines.forEach((line) => {
+            allDayCounts.set(line.itemName, (allDayCounts.get(line.itemName) ?? 0) + line.quantity);
+        });
+    });
+    const productionCounts = Array.from(allDayCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
     return (
-        <section className="page-grid two">
-            <Panel title="Kitchen" action={`${tickets.length} tickets`}>
-                <div className="ticket-list">
-                    {tickets.length === 0 && <p className="empty-copy">No tickets</p>}
-                    {tickets.map((ticket) => (
-                        <article className="ticket-card" key={ticket.id}>
-                            <div>
-                                <strong>{ticket.ticketNumber}</strong>
-                                <StatusBadge status={ticket.status}/>
-                            </div>
-                            <span>{ticket.routeName} / {ticket.invoiceNumber}</span>
-                            {ticket.lines.map((line) => (
-                                <small key={line.id}>{line.quantity} x {line.itemName}{line.notes ? ` / ${line.notes}` : ''}</small>
-                            ))}
-                            <div className="ticket-actions">
-                                {['preparing', 'ready', 'served'].map((status) => (
-                                    <button className="ghost-button" type="button" key={status} onClick={() => onUpdateTicket(ticket.id, status)}>
-                                        {humanStatus(status)}
-                                    </button>
-                                ))}
-                                <button type="button" onClick={() => onQueuePrint('kot', ticket.saleId)}>Print</button>
-                            </div>
-                        </article>
+        <section className="kds-layout">
+            <div className="kds-command">
+                <div className="segmented station-tabs">
+                    {stations.map((name) => (
+                        <button type="button" className={station === name ? 'active' : ''} key={name} onClick={() => setStation(name)}>
+                            {name === 'all' ? 'All Stations' : name}
+                        </button>
                     ))}
                 </div>
-            </Panel>
-            <Panel title="Print Jobs" action={`${printJobs.length} queued`}>
+                <div className="kds-stat">
+                    <span>Active</span>
+                    <strong>{activeTickets.length}</strong>
+                </div>
+                <div className="kds-stat">
+                    <span>Ready</span>
+                    <strong>{visibleTickets.filter((ticket) => ticket.status === 'ready').length}</strong>
+                </div>
+                <div className="kds-stat">
+                    <span>Failed prints</span>
+                    <strong>{printJobs.filter((job) => job.status === 'failed').length}</strong>
+                </div>
+            </div>
+
+            <section className="kds-board">
+                {visibleTickets.length === 0 && <p className="empty-copy">No tickets for this station</p>}
+                {visibleTickets.map((ticket) => {
+                    const age = ticketAgeMinutes(ticket.createdAt);
+                    const ageClass = age >= 20 ? 'age-hot' : age >= 10 ? 'age-warn' : 'age-fresh';
+                    return (
+                        <article className={`kds-ticket ${ticket.status} ${ageClass}`} key={ticket.id}>
+                            <div className="kds-ticket-head">
+                                <div>
+                                    <strong>{ticket.ticketNumber}</strong>
+                                    <span>{ticket.routeName} / {ticket.invoiceNumber}</span>
+                                </div>
+                                <div>
+                                    <StatusBadge status={ticket.status}/>
+                                    <em>{Math.round(age)}m</em>
+                                </div>
+                            </div>
+                            <div className="kds-lines">
+                                {ticket.lines.map((line) => (
+                                    <div key={line.id}>
+                                        <strong>{line.quantity} x {line.itemName}</strong>
+                                        {line.notes && <span>{line.notes}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="kds-actions">
+                                {ticket.status !== 'preparing' && ticket.status !== 'ready' && ticket.status !== 'served' && (
+                                    <button type="button" onClick={() => onUpdateTicket(ticket.id, 'preparing')}>Start</button>
+                                )}
+                                {ticket.status === 'preparing' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'ready')}>Ready</button>}
+                                {ticket.status === 'ready' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'served')}>Served</button>}
+                                {ticket.status === 'served' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'preparing')}>Recall</button>}
+                                <button className="ghost-button" type="button" onClick={() => onQueuePrint('kot', ticket.saleId)}>Print</button>
+                            </div>
+                        </article>
+                    );
+                })}
+            </section>
+
+            <aside className="kds-side">
+                <Panel title="All-Day Counts" action={`${productionCounts.length} items`}>
+                    <div className="data-list">
+                        {productionCounts.length === 0 && <p className="empty-copy">Counts appear as KOTs arrive</p>}
+                        {productionCounts.map(([name, count]) => (
+                            <DataRow key={name} label={name} value={String(count)}/>
+                        ))}
+                    </div>
+                </Panel>
+                <Panel title="Print Jobs" action={`${printJobs.length} queued`}>
                 <div className="print-list">
                     {printJobs.length === 0 && <p className="empty-copy">No print jobs</p>}
                     {printJobs.slice(0, 8).map((job) => (
@@ -2798,7 +3037,8 @@ function KitchenPage({tickets, printJobs, onUpdateTicket, onQueuePrint}: {
                         </article>
                     ))}
                 </div>
-            </Panel>
+                </Panel>
+            </aside>
         </section>
     );
 }
@@ -3605,6 +3845,148 @@ function AccountingPage({snapshot, busy, onRebuild, onExportCSV}: {
     );
 }
 
+function AdminCommandCenter({analytics, dashboard, pilot, range, onRange, onRefresh, onNavigate}: {
+    analytics: AdminAnalytics | null;
+    dashboard: Dashboard;
+    pilot: PilotWorkspace;
+    range: string;
+    onRange: (value: string) => void;
+    onRefresh: () => void;
+    onNavigate: (page: PageKey) => void;
+}) {
+    if (!analytics) {
+        return (
+            <section className="admin-command">
+                <Panel title="Command Center" action="Loading">
+                    <p className="empty-copy">Preparing business analytics</p>
+                </Panel>
+            </section>
+        );
+    }
+    const stockRisk = analytics.inventoryHealth.filter((row) => row.status !== 'healthy').slice(0, 7);
+    const failedJobs = pilot.printJobs.filter((job) => job.status === 'failed').length;
+    return (
+        <section className="admin-command">
+            <div className="admin-hero">
+                <div>
+                    <span className="eyebrow">Administration / {analytics.rangeLabel}</span>
+                    <h2>{dashboard.restaurant.name} operating picture</h2>
+                    <p>{analytics.demoFallback ? 'Demo baseline is active until more closed-sale history is available.' : `Snapshot refreshed ${formatTime(analytics.snapshotStatus.updatedAt)} with ${analytics.snapshotStatus.dailyRows} day rows.`}</p>
+                </div>
+                <div className="admin-hero-actions">
+                    <div className="segmented">
+                        {['7d', '30d', '90d', 'all'].map((option) => (
+                            <button type="button" className={range === option ? 'active' : ''} key={option} onClick={() => onRange(option)}>
+                                {option === 'all' ? 'All' : option.toUpperCase()}
+                            </button>
+                        ))}
+                    </div>
+                    <button type="button" onClick={onRefresh}>Refresh Analytics</button>
+                </div>
+            </div>
+
+            <section className="admin-metric-grid">
+                {analytics.executive.map((metric) => (
+                    <article className={`admin-metric ${metric.tone}`} key={metric.id}>
+                        <span>{metric.label}</span>
+                        <strong>{formatAnalyticsValue(metric.value, metric.format)}</strong>
+                        <em>{metric.detail}</em>
+                    </article>
+                ))}
+            </section>
+
+            <section className="admin-grid">
+                <Panel title="Sales Trend" action={`${analytics.salesTrend.length} points`}>
+                    <LineChart points={analytics.salesTrend} format="currency"/>
+                </Panel>
+                <Panel title="Tender Mix" action="Settlement">
+                    <BarList points={analytics.tenderMix} format="currency"/>
+                </Panel>
+                <Panel title="Category Mix" action="Menu demand">
+                    <BarList points={analytics.categoryMix} format="currency"/>
+                </Panel>
+                <Panel title="Hourly Heatmap" action="Rush pattern">
+                    <Heatmap points={analytics.hourlyHeatmap}/>
+                </Panel>
+                <Panel title="Item Velocity" action="Quantity">
+                    <BarList points={analytics.itemVelocity} format="number"/>
+                </Panel>
+                <Panel title="Contribution Margin" action="Profit pool">
+                    <BarList points={analytics.contributionMargin} format="currency"/>
+                </Panel>
+                <Panel title="Kitchen Aging" action={`${analytics.kitchenPerformance.length} stations`}>
+                    <div className="station-health-list">
+                        {analytics.kitchenPerformance.length === 0 && <p className="empty-copy">No active kitchen tickets</p>}
+                        {analytics.kitchenPerformance.map((row) => (
+                            <article className="station-health" key={row.routeName}>
+                                <div>
+                                    <strong>{row.routeName}</strong>
+                                    <span>{row.openTickets} open / {row.readyTickets} ready / {row.servedTickets} served</span>
+                                </div>
+                                <em>{Math.round(row.oldestAgeMin)}m oldest</em>
+                            </article>
+                        ))}
+                    </div>
+                </Panel>
+                <Panel title="Inventory Risk" action={`${stockRisk.length} watch`}>
+                    <div className="inventory-risk-list">
+                        {stockRisk.length === 0 && <p className="empty-copy">No stock items are under pressure</p>}
+                        {stockRisk.map((row) => (
+                            <article className={`inventory-risk ${row.status}`} key={row.id}>
+                                <div>
+                                    <strong>{row.name}</strong>
+                                    <span>{compactNumber.format(row.onHandQty)} {row.unit} / reorder {compactNumber.format(row.reorderPoint)}</span>
+                                </div>
+                                <em>{Math.round(row.riskScore)}%</em>
+                            </article>
+                        ))}
+                    </div>
+                </Panel>
+                <Panel title="Purchase And Rejection Trend" action="Vendors">
+                    <BarList points={analytics.purchaseTrend} format="currency"/>
+                </Panel>
+                <Panel title="Settlement Health" action="Cash / tax / vendors">
+                    <div className="settlement-grid">
+                        <DataRow label="Cash expected" value={currency.format(analytics.settlement.cashExpected)}/>
+                        <DataRow label="Cash variance" value={currency.format(analytics.settlement.cashVariance)}/>
+                        <DataRow label="Razorpay clearing" value={currency.format(analytics.settlement.razorpayClearing)}/>
+                        <DataRow label="GST payable" value={currency.format(analytics.settlement.taxPayable)}/>
+                        <DataRow label="Vendor payables" value={currency.format(analytics.settlement.vendorPayables)}/>
+                        <DataRow label="Print failures" value={String(failedJobs)}/>
+                    </div>
+                </Panel>
+                <Panel title="Item Performance Matrix" action="Margin x velocity">
+                    <MatrixQuadrants buckets={analytics.itemMatrix}/>
+                </Panel>
+                <Panel title="Focus Here" action={`${analytics.recommendations.length} moves`}>
+                    <div className="recommendation-list">
+                        {analytics.recommendations.map((item) => (
+                            <article className="recommendation-card" key={item.id}>
+                                <span>Priority {item.priority}</span>
+                                <strong>{item.title}</strong>
+                                <p>{item.detail}</p>
+                                <button type="button" onClick={() => onNavigate(item.page || 'admin')}>Open {pageLabel(item.page)}</button>
+                            </article>
+                        ))}
+                    </div>
+                </Panel>
+                <Panel title="Exception Board" action={`${analytics.exceptions.length} live`}>
+                    <div className="exception-list">
+                        {analytics.exceptions.length === 0 && <p className="empty-copy">No major exceptions</p>}
+                        {analytics.exceptions.map((item) => (
+                            <article className={`exception-card ${item.severity}`} key={item.id}>
+                                <span>{item.kind}</span>
+                                <strong>{item.title}</strong>
+                                <p>{item.detail}</p>
+                            </article>
+                        ))}
+                    </div>
+                </Panel>
+            </section>
+        </section>
+    );
+}
+
 function SettingsPage({
     metrics,
     notifications,
@@ -3786,6 +4168,93 @@ function InvoiceStack({invoices, empty, onOpen, renderActions}: {
     );
 }
 
+function LineChart({points, format}: {points: AnalyticsPoint[]; format: string}) {
+    const safePoints = points.length > 0 ? points : [{label: 'No data', value: 0, count: 0, tone: 'muted'}];
+    const max = Math.max(...safePoints.map((point) => point.value), 1);
+    const width = 640;
+    const height = 210;
+    const step = safePoints.length > 1 ? width / (safePoints.length - 1) : width;
+    const plot = safePoints.map((point, index) => {
+        const x = safePoints.length > 1 ? index * step : width / 2;
+        const y = height - ((point.value / max) * (height - 28)) - 12;
+        return `${x},${y}`;
+    }).join(' ');
+    return (
+        <div className="line-chart">
+            <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend chart">
+                <polyline points={plot} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+                {safePoints.map((point, index) => {
+                    const x = safePoints.length > 1 ? index * step : width / 2;
+                    const y = height - ((point.value / max) * (height - 28)) - 12;
+                    return <circle key={`${point.label}-${index}`} cx={x} cy={y} r="5"/>;
+                })}
+            </svg>
+            <div className="chart-label-row">
+                {safePoints.slice(0, 7).map((point, index) => (
+                    <span key={`${point.label}-${index}`}>{point.label}<strong>{formatAnalyticsValue(point.value, format)}</strong></span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function BarList({points, format}: {points: AnalyticsPoint[]; format: string}) {
+    const max = Math.max(...points.map((point) => point.value), 1);
+    return (
+        <div className="bar-list">
+            {points.length === 0 && <p className="empty-copy">No data in this range</p>}
+            {points.map((point, index) => (
+                <div className={`bar-row ${point.tone || ''}`} key={`${point.label}-${index}`}>
+                    <span>{point.label}</span>
+                    <i><b style={{width: `${Math.max(3, (point.value / max) * 100)}%`}}/></i>
+                    <strong>{formatAnalyticsValue(point.value, format)}</strong>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function Heatmap({points}: {points: AnalyticsPoint[]}) {
+    const max = Math.max(...points.map((point) => point.value), 1);
+    return (
+        <div className="heatmap">
+            {points.length === 0 && <p className="empty-copy">No hourly pattern yet</p>}
+            {points.map((point, index) => {
+                const intensity = Math.max(0.14, point.value / max);
+                return (
+                    <div style={{'--heat': intensity} as CSSProperties} key={`${point.label}-${index}`}>
+                        <strong>{point.label}</strong>
+                        <span>{currency.format(point.value)}</span>
+                        <em>{point.count} orders</em>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function MatrixQuadrants({buckets}: {buckets: ItemMatrixBucket[]}) {
+    return (
+        <div className="matrix-grid">
+            {buckets.map((bucket) => (
+                <article className={`matrix-bucket ${bucket.id}`} key={bucket.id}>
+                    <strong>{bucket.label}</strong>
+                    <span>{bucket.description}</span>
+                    <div>
+                        {bucket.items.length === 0 && <p className="empty-copy">No items</p>}
+                        {bucket.items.map((item) => (
+                            <button type="button" key={item.itemId}>
+                                <span>{item.name}</span>
+                                <em>{item.quantity} sold / {Math.round(item.marginPct)}%</em>
+                            </button>
+                        ))}
+                    </div>
+                </article>
+            ))}
+        </div>
+    );
+}
+
 function Metric({label, value, tone}: {label: string; value: string; tone: string}) {
     return (
         <article className={`metric-card ${tone}`}>
@@ -3932,6 +4401,40 @@ function normalizePilotWorkspace(input: PilotWorkspace): PilotWorkspace {
     };
 }
 
+function normalizeAdminAnalytics(input: AdminAnalytics): AdminAnalytics {
+    return {
+        ...input,
+        executive: input.executive ?? [],
+        salesTrend: input.salesTrend ?? [],
+        hourlyHeatmap: input.hourlyHeatmap ?? [],
+        tenderMix: input.tenderMix ?? [],
+        categoryMix: input.categoryMix ?? [],
+        itemVelocity: input.itemVelocity ?? [],
+        contributionMargin: input.contributionMargin ?? [],
+        inventoryHealth: input.inventoryHealth ?? [],
+        kitchenPerformance: input.kitchenPerformance ?? [],
+        purchaseTrend: input.purchaseTrend ?? [],
+        itemMatrix: (input.itemMatrix ?? []).map((bucket) => ({...bucket, items: bucket.items ?? []})),
+        settlement: input.settlement ?? {
+            cashExpected: 0,
+            cashVariance: 0,
+            upiTotal: 0,
+            cardTotal: 0,
+            razorpayTotal: 0,
+            razorpayClearing: 0,
+            taxPayable: 0,
+            vendorPayables: 0,
+            refundTotal: 0,
+        },
+        exceptions: input.exceptions ?? [],
+        recommendations: (input.recommendations ?? []).map((item) => ({
+            ...item,
+            page: pages.some((page) => page.key === item.page) ? item.page : 'admin',
+        })),
+        snapshotStatus: input.snapshotStatus ?? {dailyRows: 0, itemRows: 0, hourlyRows: 0, updatedAt: ''},
+    };
+}
+
 function normalizeInvoiceDetail(input: InvoiceDetail): InvoiceDetail {
     return {
         ...input,
@@ -4037,6 +4540,24 @@ function normalizeOrderSessionDetail(input: OrderSessionDetail): OrderSessionDet
 
 function humanStatus(status: string) {
     return status.replace(/_/g, ' ');
+}
+
+function pageLabel(pageKey: PageKey) {
+    return pages.find((page) => page.key === pageKey)?.label ?? 'Command Center';
+}
+
+function formatAnalyticsValue(value: number, format: string) {
+    if (format === 'currency') return currency.format(value || 0);
+    if (format === 'percent') return `${Math.round(value || 0)}%`;
+    if (format === 'minutes') return `${Math.round(value || 0)}m`;
+    return compactNumber.format(value || 0);
+}
+
+function ticketAgeMinutes(createdAt: string) {
+    if (!createdAt) return 0;
+    const created = new Date(createdAt).getTime();
+    if (!Number.isFinite(created)) return 0;
+    return Math.max(0, (Date.now() - created) / 60000);
 }
 
 function printerModeFromTarget(target: string) {

@@ -788,6 +788,88 @@ func TestDayCloseAndAccountingShell(t *testing.T) {
 	}
 }
 
+func TestAdminAnalyticsEmptyStateUsesDemoFallback(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	analytics, err := store.GetAdminAnalytics("30d")
+	if err != nil {
+		t.Fatalf("get admin analytics: %v", err)
+	}
+	if !analytics.DemoFallback {
+		t.Fatalf("expected demo fallback when no closed sales exist")
+	}
+	if len(analytics.SalesTrend) == 0 || len(analytics.Recommendations) == 0 {
+		t.Fatalf("expected demo trend and recommendations, got %#v", analytics)
+	}
+}
+
+func TestAdminAnalyticsTotalsMatrixAndSnapshots(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	first := closeDraftOrder(t, store, []SaleLineInput{{ItemID: "item_latte", Quantity: 2}})
+	second := closeDraftOrder(t, store, []SaleLineInput{{ItemID: "item_sandwich", Quantity: 1}})
+	if _, err := store.RefundInvoice(RefundInvoiceInput{InvoiceID: second.ID, PIN: "1234", Amount: 50, Reason: "Service issue"}); err != nil {
+		t.Fatalf("refund invoice: %v", err)
+	}
+
+	analytics, err := store.GetAdminAnalytics("30d")
+	if err != nil {
+		t.Fatalf("get admin analytics: %v", err)
+	}
+	if analytics.DemoFallback {
+		t.Fatalf("did not expect demo fallback with closed sales")
+	}
+	revenue := metricValue(analytics.Executive, "net_revenue")
+	expectedRevenue := math.Round((first.Total+second.Total-50)*100) / 100
+	if math.Abs(revenue-expectedRevenue) > 0.01 {
+		t.Fatalf("unexpected net revenue: got %f want %f", revenue, expectedRevenue)
+	}
+	if len(analytics.ItemMatrix) != 4 {
+		t.Fatalf("expected four item matrix buckets, got %#v", analytics.ItemMatrix)
+	}
+	if analytics.SnapshotStatus.DailyRows == 0 || analytics.SnapshotStatus.ItemRows == 0 || analytics.SnapshotStatus.HourlyRows == 0 {
+		t.Fatalf("expected analytics snapshots to be backfilled, got %#v", analytics.SnapshotStatus)
+	}
+	if len(analytics.CategoryMix) == 0 || len(analytics.ItemVelocity) == 0 || len(analytics.ContributionMargin) == 0 {
+		t.Fatalf("expected item analytics, got category=%#v velocity=%#v margin=%#v", analytics.CategoryMix, analytics.ItemVelocity, analytics.ContributionMargin)
+	}
+}
+
+func TestAdminAnalyticsRefundAndVoidControls(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	closed := closeDraftOrder(t, store, []SaleLineInput{{ItemID: "item_latte", Quantity: 1}})
+	if _, err := store.RefundInvoice(RefundInvoiceInput{InvoiceID: closed.ID, PIN: "1234", Amount: 40, Reason: "Guest issue"}); err != nil {
+		t.Fatalf("refund invoice: %v", err)
+	}
+	draft := saveDraftOrder(t, store, []SaleLineInput{{ItemID: "item_cappuccino", Quantity: 1}})
+	if _, err := store.VoidInvoice(VoidInvoiceInput{InvoiceID: draft.ID, PIN: "1234", Reason: "Mistake"}); err != nil {
+		t.Fatalf("void invoice: %v", err)
+	}
+
+	analytics, err := store.GetAdminAnalytics("30d")
+	if err != nil {
+		t.Fatalf("get admin analytics: %v", err)
+	}
+	refundsVoids := metricValue(analytics.Executive, "refunds_voids")
+	if refundsVoids != 40 {
+		t.Fatalf("expected refund metric to be 40, got %f", refundsVoids)
+	}
+	foundVoidException := false
+	for _, exception := range analytics.Exceptions {
+		if exception.ID == "voids" {
+			foundVoidException = true
+			break
+		}
+	}
+	if !foundVoidException {
+		t.Fatalf("expected void exception, got %#v", analytics.Exceptions)
+	}
+}
+
 func TestMenuImportAndPriceUpdate(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
@@ -1025,6 +1107,11 @@ func saveDraftOrder(t *testing.T, store *Store, lines []SaleLineInput) InvoiceSu
 	if len(invoices) == 0 {
 		t.Fatalf("expected invoice")
 	}
+	for _, invoice := range invoices {
+		if invoice.Status == "draft" {
+			return invoice
+		}
+	}
 	return invoices[0]
 }
 
@@ -1039,4 +1126,13 @@ func closeDraftOrder(t *testing.T, store *Store, lines []SaleLineInput) InvoiceS
 		t.Fatalf("get closed detail: %v", err)
 	}
 	return detail.Summary
+}
+
+func metricValue(metrics []AnalyticsMetric, id string) float64 {
+	for _, metric := range metrics {
+		if metric.ID == id {
+			return metric.Value
+		}
+	}
+	return 0
 }

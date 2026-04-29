@@ -26,6 +26,8 @@ export function ExportInvoicesCSV(arg1:nexus.InvoiceFilter):Promise<nexus.Export
 
 export function GetAccountingSnapshot():Promise<nexus.AccountingSnapshot>;
 
+export function GetAdminAnalytics(arg1:string):Promise<nexus.AdminAnalytics>;
+
 export function GetAuditLog(arg1:number):Promise<Array<nexus.AuditLogEntry>>;
 
 export function GetDashboard():Promise<nexus.Dashboard>;
