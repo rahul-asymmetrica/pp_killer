@@ -434,6 +434,13 @@ func (a *App) ExportBackup(input nexus.BackupInput) (nexus.ExportResult, error) 
 	return a.store.ExportBackup(input)
 }
 
+func (a *App) SeedDemoOperations(months int) (nexus.DemoSeedResult, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.DemoSeedResult{}, err
+	}
+	return a.store.SeedDemoOperations(months)
+}
+
 func (a *App) SaveVendor(input nexus.VendorInput) (nexus.PilotWorkspace, error) {
 	if err := a.ensureReady(); err != nil {
 		return nexus.PilotWorkspace{}, err

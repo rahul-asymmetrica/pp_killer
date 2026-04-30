@@ -106,6 +106,8 @@ export function SaveStaff(arg1:nexus.StaffInput):Promise<nexus.PilotWorkspace>;
 
 export function SaveVendor(arg1:nexus.VendorInput):Promise<nexus.PilotWorkspace>;
 
+export function SeedDemoOperations(arg1:number):Promise<nexus.DemoSeedResult>;
+
 export function SendKOT(arg1:string):Promise<nexus.Dashboard>;
 
 export function SendOrderSessionKOT(arg1:string):Promise<nexus.OrderSessionDetail>;

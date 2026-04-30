@@ -924,6 +924,23 @@ type BackupInput struct {
 	Destination string `json:"destination"`
 }
 
+type DemoSeedResult struct {
+	Months         int     `json:"months"`
+	BusinessDays   int     `json:"businessDays"`
+	Tables         int     `json:"tables"`
+	Waiters        int     `json:"waiters"`
+	Customers      int     `json:"customers"`
+	Invoices       int     `json:"invoices"`
+	KitchenTickets int     `json:"kitchenTickets"`
+	DayCloses      int     `json:"dayCloses"`
+	PurchaseOrders int     `json:"purchaseOrders"`
+	Refunds        int     `json:"refunds"`
+	Voids          int     `json:"voids"`
+	SalesTotal     float64 `json:"salesTotal"`
+	StartedAt      string  `json:"startedAt"`
+	EndedAt        string  `json:"endedAt"`
+}
+
 type SyncStatus struct {
 	PendingCount    int    `json:"pendingCount"`
 	SyncedCount     int    `json:"syncedCount"`

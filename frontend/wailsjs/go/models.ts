@@ -1104,6 +1104,44 @@ export namespace nexus {
 	}
 
 
+	export class DemoSeedResult {
+	    months: number;
+	    businessDays: number;
+	    tables: number;
+	    waiters: number;
+	    customers: number;
+	    invoices: number;
+	    kitchenTickets: number;
+	    dayCloses: number;
+	    purchaseOrders: number;
+	    refunds: number;
+	    voids: number;
+	    salesTotal: number;
+	    startedAt: string;
+	    endedAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new DemoSeedResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.months = source["months"];
+	        this.businessDays = source["businessDays"];
+	        this.tables = source["tables"];
+	        this.waiters = source["waiters"];
+	        this.customers = source["customers"];
+	        this.invoices = source["invoices"];
+	        this.kitchenTickets = source["kitchenTickets"];
+	        this.dayCloses = source["dayCloses"];
+	        this.purchaseOrders = source["purchaseOrders"];
+	        this.refunds = source["refunds"];
+	        this.voids = source["voids"];
+	        this.salesTotal = source["salesTotal"];
+	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
+	    }
+	}
 	export class DiningTable {
 	    id: string;
 	    sectionId: string;

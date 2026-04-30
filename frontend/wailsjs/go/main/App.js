@@ -210,6 +210,10 @@ export function SaveVendor(arg1) {
   return window['go']['main']['App']['SaveVendor'](arg1);
 }
 
+export function SeedDemoOperations(arg1) {
+  return window['go']['main']['App']['SeedDemoOperations'](arg1);
+}
+
 export function SendKOT(arg1) {
   return window['go']['main']['App']['SendKOT'](arg1);
 }

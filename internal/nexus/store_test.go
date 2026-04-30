@@ -1176,6 +1176,53 @@ func TestSyncStatusAndBackupExport(t *testing.T) {
 	}
 }
 
+func TestSeedDemoOperationsCreatesDemoDataset(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	result, err := store.SeedDemoOperations(1)
+	if err != nil {
+		t.Fatalf("seed demo operations: %v", err)
+	}
+	if result.Tables != 50 || result.Waiters != 20 {
+		t.Fatalf("expected 50 tables and 20 waiters, got %#v", result)
+	}
+	if result.BusinessDays < 28 || result.Invoices < 1000 || result.KitchenTickets < 1000 || result.DayCloses != result.BusinessDays {
+		t.Fatalf("expected rich month of history, got %#v", result)
+	}
+	if result.Customers < 150 || result.PurchaseOrders == 0 || result.SalesTotal <= 0 {
+		t.Fatalf("expected customers, purchases and sales, got %#v", result)
+	}
+
+	workspace, err := store.GetPilotWorkspace()
+	if err != nil {
+		t.Fatalf("workspace: %v", err)
+	}
+	waiters := 0
+	for _, member := range workspace.Staff {
+		if member.Role == "waiter" && member.Status == "active" {
+			waiters++
+		}
+	}
+	if len(workspace.Tables) != 50 || waiters != 20 {
+		t.Fatalf("workspace did not expose demo floor/staff: tables=%d waiters=%d", len(workspace.Tables), waiters)
+	}
+	dashboard, err := store.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if dashboard.Metrics.OpenKOTs == 0 {
+		t.Fatalf("expected live demo KOTs")
+	}
+	analytics, err := store.GetAdminAnalytics("30d")
+	if err != nil {
+		t.Fatalf("admin analytics: %v", err)
+	}
+	if analytics.DemoFallback || len(analytics.SalesTrend) == 0 || len(analytics.ItemMatrix) != 4 {
+		t.Fatalf("expected real analytics from demo data, got %#v", analytics)
+	}
+}
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := Open(filepath.Join(t.TempDir(), "nexus.db"))
