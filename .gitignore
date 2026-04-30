@@ -8,6 +8,7 @@ frontend/dist/
 # Wails binaries and local runtime data
 build/bin/
 data/
+.gitnexus/
 
 # OS/editor noise
 .DS_Store
