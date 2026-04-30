@@ -463,6 +463,29 @@ type StaffInput struct {
 	Status string `json:"status"`
 }
 
+type StaffLoginInput struct {
+	StaffID   string `json:"staffId"`
+	PIN       string `json:"pin"`
+	Workspace string `json:"workspace"`
+}
+
+type StaffSession struct {
+	StaffID         string   `json:"staffId"`
+	Name            string   `json:"name"`
+	Role            string   `json:"role"`
+	Permissions     []string `json:"permissions"`
+	WorkspaceAccess []string `json:"workspaceAccess"`
+	IssuedAt        string   `json:"issuedAt"`
+	ExpiresAt       string   `json:"expiresAt"`
+}
+
+type StaffActionApprovalInput struct {
+	StaffID  string `json:"staffId"`
+	PIN      string `json:"pin"`
+	Action   string `json:"action"`
+	TargetID string `json:"targetId"`
+}
+
 type MenuCategory struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -606,6 +629,14 @@ type CloseOrderSessionInput struct {
 	PaymentTendered float64 `json:"paymentTendered"`
 }
 
+type SessionLineVoidInput struct {
+	SessionID string `json:"sessionId"`
+	LineID    string `json:"lineId"`
+	StaffID   string `json:"staffId"`
+	PIN       string `json:"pin"`
+	Reason    string `json:"reason"`
+}
+
 type TableMoveInput struct {
 	SessionID     string `json:"sessionId"`
 	TargetTableID string `json:"targetTableId"`
@@ -638,6 +669,8 @@ type DayCloseInput struct {
 	BusinessDate string  `json:"businessDate"`
 	CashCounted  float64 `json:"cashCounted"`
 	Notes        string  `json:"notes"`
+	StaffID      string  `json:"staffId"`
+	PIN          string  `json:"pin"`
 }
 
 type PaymentRequest struct {
@@ -885,6 +918,23 @@ type ExportResult struct {
 	FileName string `json:"fileName"`
 	MIMEType string `json:"mimeType"`
 	Bytes    int64  `json:"bytes"`
+}
+
+type BackupInput struct {
+	Destination string `json:"destination"`
+}
+
+type SyncStatus struct {
+	PendingCount    int    `json:"pendingCount"`
+	SyncedCount     int    `json:"syncedCount"`
+	FailedCount     int    `json:"failedCount"`
+	OldestPendingAt string `json:"oldestPendingAt"`
+	LastSyncedAt    string `json:"lastSyncedAt"`
+	LastError       string `json:"lastError"`
+	DatabasePath    string `json:"databasePath"`
+	DatabaseBytes   int64  `json:"databaseBytes"`
+	WALBytes        int64  `json:"walBytes"`
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 type PilotWorkspace struct {

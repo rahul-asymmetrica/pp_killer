@@ -4,6 +4,10 @@ import {nexus} from '../models';
 
 export function AddOrderSessionLine(arg1:nexus.AddOrderSessionLineInput):Promise<nexus.OrderSessionDetail>;
 
+export function AuthenticateStaff(arg1:nexus.StaffLoginInput):Promise<nexus.StaffSession>;
+
+export function AuthorizeStaffAction(arg1:nexus.StaffActionApprovalInput):Promise<nexus.ApprovalToken>;
+
 export function CancelPaymentRequest(arg1:string):Promise<nexus.PilotWorkspace>;
 
 export function CloseDay(arg1:nexus.DayCloseInput):Promise<nexus.DayCloseSummary>;
@@ -17,6 +21,8 @@ export function CreatePaymentRequest(arg1:string):Promise<nexus.PaymentRequest>;
 export function CreatePurchaseOrder(arg1:nexus.PurchaseOrderInput):Promise<nexus.PilotWorkspace>;
 
 export function ExportAccountingCSV():Promise<nexus.ExportResult>;
+
+export function ExportBackup(arg1:nexus.BackupInput):Promise<nexus.ExportResult>;
 
 export function ExportDayClosePDF(arg1:string):Promise<nexus.ExportResult>;
 
@@ -41,6 +47,8 @@ export function GetNotifications():Promise<Array<nexus.NotificationRecord>>;
 export function GetOrderSessionDetail(arg1:string):Promise<nexus.OrderSessionDetail>;
 
 export function GetPilotWorkspace():Promise<nexus.PilotWorkspace>;
+
+export function GetSyncStatus():Promise<nexus.SyncStatus>;
 
 export function ImportMenuCSV(arg1:nexus.MenuImportInput):Promise<nexus.MenuImportResult>;
 
@@ -115,3 +123,5 @@ export function UpdateRecipe(arg1:nexus.RecipeUpdateInput):Promise<nexus.Dashboa
 export function ValidateManagerPIN(arg1:string):Promise<nexus.ApprovalToken>;
 
 export function VoidInvoice(arg1:nexus.VoidInvoiceInput):Promise<nexus.Dashboard>;
+
+export function VoidOrderSessionLine(arg1:nexus.SessionLineVoidInput):Promise<nexus.OrderSessionDetail>;

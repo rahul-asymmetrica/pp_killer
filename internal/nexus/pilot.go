@@ -40,11 +40,14 @@ func (s *Store) ensurePilotReferenceData(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
 		INSERT INTO roles (id, name, can_manage_settings, can_void, can_refund, can_close_day, created_at)
 		VALUES
+			('role_owner', 'owner', 1, 1, 1, 1, ?),
 			('role_manager', 'manager', 1, 1, 1, 1, ?),
 			('role_cashier', 'cashier', 0, 0, 0, 1, ?),
-			('role_waiter', 'waiter', 0, 0, 0, 0, ?)
+			('role_waiter', 'waiter', 0, 0, 0, 0, ?),
+			('role_kitchen', 'kitchen', 0, 0, 0, 0, ?),
+			('role_barista', 'barista', 0, 0, 0, 0, ?)
 		ON CONFLICT(id) DO NOTHING
-	`, now, now, now); err != nil {
+	`, now, now, now, now, now, now); err != nil {
 		return err
 	}
 
@@ -62,12 +65,29 @@ func (s *Store) ensurePilotReferenceData(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
 		INSERT INTO staff (id, name, role, pin_hash, status, created_at)
 		VALUES
+			('staff_owner', 'Owner Console', 'owner', ?, 'active', ?),
 			('staff_manager', 'Ananya Manager', 'manager', ?, 'active', ?),
-			('staff_waiter', 'Ravi Waiter', 'waiter', '', 'active', ?),
-			('staff_cashier', 'Neha Cashier', 'cashier', '', 'active', ?)
+			('staff_waiter', 'Ravi Waiter', 'waiter', ?, 'active', ?),
+			('staff_cashier', 'Neha Cashier', 'cashier', ?, 'active', ?),
+			('staff_kitchen', 'Hot Kitchen', 'kitchen', ?, 'active', ?),
+			('staff_barista', 'Coffee Bar', 'barista', ?, 'active', ?)
 		ON CONFLICT(id) DO NOTHING
-	`, hashPIN("1234", "staff_manager"), now, now, now); err != nil {
+	`, hashPIN("1234", "staff_owner"), now, hashPIN("1234", "staff_manager"), now, hashPIN("1234", "staff_waiter"), now,
+		hashPIN("1234", "staff_cashier"), now, hashPIN("1234", "staff_kitchen"), now, hashPIN("1234", "staff_barista"), now); err != nil {
 		return err
+	}
+	defaultPins := map[string]string{
+		"staff_owner":   hashPIN("1234", "staff_owner"),
+		"staff_manager": hashPIN("1234", "staff_manager"),
+		"staff_waiter":  hashPIN("1234", "staff_waiter"),
+		"staff_cashier": hashPIN("1234", "staff_cashier"),
+		"staff_kitchen": hashPIN("1234", "staff_kitchen"),
+		"staff_barista": hashPIN("1234", "staff_barista"),
+	}
+	for id, pinHash := range defaultPins {
+		if _, err := tx.Exec("UPDATE staff SET pin_hash = ? WHERE id = ? AND pin_hash = ''", pinHash, id); err != nil {
+			return err
+		}
 	}
 
 	if _, err := tx.Exec(`
@@ -312,6 +332,14 @@ func (s *Store) SaveStaff(input StaffInput) (PilotWorkspace, error) {
 	if id == "" {
 		id = mustID()
 	}
+	var existingHash string
+	err := s.db.QueryRow("SELECT pin_hash FROM staff WHERE id = ?", id).Scan(&existingHash)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return PilotWorkspace{}, err
+	}
+	if existingHash == "" && strings.TrimSpace(input.PIN) == "" {
+		return PilotWorkspace{}, errors.New("staff PIN is required")
+	}
 	hash := ""
 	if strings.TrimSpace(input.PIN) != "" {
 		hash = hashPIN(input.PIN, id)
@@ -434,6 +462,9 @@ func (s *Store) OpenOrderSession(input OpenOrderSessionInput) (OrderSessionDetai
 		return OrderSessionDetail{}, err
 	}
 	defer rollback(tx)
+	if err := ensureBusinessDateOpenTx(tx, todayDate()); err != nil {
+		return OrderSessionDetail{}, err
+	}
 	var active string
 	if err := tx.QueryRow("SELECT active_session_id FROM dining_tables WHERE id = ?", input.TableID).Scan(&active); err != nil {
 		return OrderSessionDetail{}, err
@@ -484,6 +515,9 @@ func (s *Store) AddOrderSessionLine(input AddOrderSessionLineInput) (OrderSessio
 	if err := tx.QueryRow("SELECT status FROM order_sessions WHERE id = ?", input.SessionID).Scan(&status); err != nil {
 		return OrderSessionDetail{}, err
 	}
+	if err := ensureSessionBusinessDateOpenTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
 	if status != "open" && status != "held" {
 		return OrderSessionDetail{}, fmt.Errorf("cannot add lines to %s session", status)
 	}
@@ -527,6 +561,95 @@ func (s *Store) AddOrderSessionLine(input AddOrderSessionLineInput) (OrderSessio
 	return s.GetOrderSessionDetail(input.SessionID)
 }
 
+func (s *Store) VoidOrderSessionLine(input SessionLineVoidInput) (OrderSessionDetail, error) {
+	input.SessionID = strings.TrimSpace(input.SessionID)
+	input.LineID = strings.TrimSpace(input.LineID)
+	if input.SessionID == "" || input.LineID == "" {
+		return OrderSessionDetail{}, errors.New("session and line are required")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return OrderSessionDetail{}, err
+	}
+	defer rollback(tx)
+	if err := ensureSessionBusinessDateOpenTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+
+	now := nowUTC()
+	var approval ApprovalToken
+	if strings.TrimSpace(input.StaffID) != "" {
+		approval, err = approveStaffActionTx(tx, StaffActionApprovalInput{StaffID: input.StaffID, PIN: input.PIN, Action: "line_void", TargetID: input.LineID}, now)
+	} else {
+		approval, err = approveManagerTx(tx, "line_void", input.LineID, input.PIN, now)
+	}
+	if err != nil {
+		return OrderSessionDetail{}, err
+	}
+
+	var lineSessionID, itemID, itemName, lineStatus, kotStatus string
+	var quantity int
+	if err := tx.QueryRow(`
+		SELECT session_id, item_id, item_name, quantity, status, kot_status
+		FROM order_session_lines
+		WHERE id = ?
+	`, input.LineID).Scan(&lineSessionID, &itemID, &itemName, &quantity, &lineStatus, &kotStatus); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if lineSessionID != input.SessionID {
+		return OrderSessionDetail{}, errors.New("line does not belong to this session")
+	}
+	if lineStatus != "open" {
+		return OrderSessionDetail{}, fmt.Errorf("cannot void %s line", lineStatus)
+	}
+	reason := strings.TrimSpace(input.Reason)
+	if reason == "" {
+		reason = "Voided by manager"
+	}
+	nextKOTStatus := kotStatus
+	if kotStatus != "not_sent" {
+		nextKOTStatus = "cancelled"
+	}
+	if _, err := tx.Exec(`
+		UPDATE order_session_lines
+		SET status = 'voided', kot_status = ?
+		WHERE id = ?
+	`, nextKOTStatus, input.LineID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if kotStatus != "not_sent" {
+		var invoiceID string
+		_ = tx.QueryRow("SELECT invoice_id FROM order_sessions WHERE id = ?", input.SessionID).Scan(&invoiceID)
+		if invoiceID != "" {
+			if _, err := tx.Exec(`
+				UPDATE kitchen_ticket_lines
+				SET status = 'cancelled'
+				WHERE item_id = ?
+					AND ticket_id IN (SELECT id FROM kitchen_tickets WHERE sale_id = ?)
+			`, itemID, invoiceID); err != nil {
+				return OrderSessionDetail{}, err
+			}
+		}
+	}
+	if err := recalcSessionTotalsTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if err := syncSessionInvoiceTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	detail := fmt.Sprintf("%dx %s voided: %s", quantity, itemName, reason)
+	if err := insertSessionEventTx(tx, input.SessionID, "line_voided", detail, approval.ApprovedBy, now); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if err := insertSyncLog(tx, "order_session_line", input.LineID, "void", map[string]any{"sessionID": input.SessionID, "lineID": input.LineID, "reason": reason, "approvedBy": approval.ApprovedBy}, now); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	return s.GetOrderSessionDetail(input.SessionID)
+}
+
 func (s *Store) TransferOrderSession(input TableMoveInput) (OrderSessionDetail, error) {
 	if input.SessionID == "" || input.TargetTableID == "" {
 		return OrderSessionDetail{}, errors.New("session and target table are required")
@@ -536,6 +659,9 @@ func (s *Store) TransferOrderSession(input TableMoveInput) (OrderSessionDetail, 
 		return OrderSessionDetail{}, err
 	}
 	defer rollback(tx)
+	if err := ensureSessionBusinessDateOpenTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
 	var oldTableID, active string
 	if err := tx.QueryRow("SELECT table_id FROM order_sessions WHERE id = ? AND status IN ('open', 'held')", input.SessionID).Scan(&oldTableID); err != nil {
 		return OrderSessionDetail{}, err
@@ -570,6 +696,9 @@ func (s *Store) SendOrderSessionKOT(sessionID string) (OrderSessionDetail, error
 		return OrderSessionDetail{}, err
 	}
 	defer rollback(tx)
+	if err := ensureSessionBusinessDateOpenTx(tx, sessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
 	invoiceID, err := ensureSessionInvoiceTx(tx, sessionID, "", "", "cash")
 	if err != nil {
 		return OrderSessionDetail{}, err
@@ -599,6 +728,9 @@ func (s *Store) CloseOrderSession(input CloseOrderSessionInput) (Dashboard, erro
 		return Dashboard{}, err
 	}
 	defer rollback(tx)
+	if err := ensureSessionBusinessDateOpenTx(tx, input.SessionID); err != nil {
+		return Dashboard{}, err
+	}
 	invoiceID, err := ensureSessionInvoiceTx(tx, input.SessionID, input.CustomerName, input.CustomerPhone, input.PaymentMethod)
 	if err != nil {
 		return Dashboard{}, err
@@ -641,6 +773,13 @@ func (s *Store) UpdateKOTStatus(ticketID, status string) (Dashboard, error) {
 
 	var saleID, ticketNumber, routeName string
 	if err := tx.QueryRow("SELECT sale_id, ticket_number, route_name FROM kitchen_tickets WHERE id = ?", ticketID).Scan(&saleID, &ticketNumber, &routeName); err != nil {
+		return Dashboard{}, err
+	}
+	var saleCreatedAt string
+	if err := tx.QueryRow("SELECT created_at FROM sales WHERE id = ?", saleID).Scan(&saleCreatedAt); err != nil {
+		return Dashboard{}, err
+	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, saleCreatedAt); err != nil {
 		return Dashboard{}, err
 	}
 	if _, err := tx.Exec("UPDATE kitchen_tickets SET status = ? WHERE id = ?", status, ticketID); err != nil {
@@ -946,6 +1085,9 @@ func (s *Store) CreatePurchaseOrder(input PurchaseOrderInput) (PilotWorkspace, e
 	}
 	defer rollback(tx)
 	now := nowUTC()
+	if err := ensureBusinessDateOpenTx(tx, businessDateFromTimestamp(now)); err != nil {
+		return PilotWorkspace{}, err
+	}
 	poID := mustID()
 	poNumber, err := nextDocumentNumber(tx, "invoice_prefix", "next_po_seq")
 	if err != nil {
@@ -995,6 +1137,9 @@ func (s *Store) ReceivePurchaseOrder(input ReceivePurchaseOrderInput) (PilotWork
 	}
 	defer rollback(tx)
 	now := nowUTC()
+	if err := ensureBusinessDateOpenTx(tx, businessDateFromTimestamp(now)); err != nil {
+		return PilotWorkspace{}, err
+	}
 	var vendorID string
 	if err := tx.QueryRow("SELECT vendor_id FROM purchase_orders WHERE id = ?", input.PurchaseOrderID).Scan(&vendorID); err != nil {
 		return PilotWorkspace{}, err
@@ -1066,39 +1211,58 @@ func (s *Store) CloseDay(input DayCloseInput) (DayCloseSummary, error) {
 	if input.BusinessDate == "" {
 		input.BusinessDate = todayDate()
 	}
-	summary, err := s.dayClosePreview(input.BusinessDate)
+	summary, err := s.calculateDayClosePreview(input.BusinessDate)
+	if err != nil {
+		return DayCloseSummary{}, err
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return DayCloseSummary{}, err
+	}
+	defer rollback(tx)
+	now := nowUTC()
+	if err := ensureBusinessDateOpenTx(tx, input.BusinessDate); err != nil {
+		return DayCloseSummary{}, err
+	}
+	if err := ensureDayCanCloseTx(tx, input.BusinessDate); err != nil {
+		return DayCloseSummary{}, err
+	}
+	var approval ApprovalToken
+	if strings.TrimSpace(input.StaffID) != "" {
+		approval, err = approveStaffActionTx(tx, StaffActionApprovalInput{StaffID: input.StaffID, PIN: input.PIN, Action: "close_day", TargetID: input.BusinessDate}, now)
+	} else {
+		approval, err = approveManagerTx(tx, "close_day", input.BusinessDate, input.PIN, now)
+	}
 	if err != nil {
 		return DayCloseSummary{}, err
 	}
 	summary.ID = mustID()
 	summary.CashCounted = round2(input.CashCounted)
 	summary.CashVariance = round2(summary.CashCounted - summary.CashExpected)
-	summary.ClosedAt = nowUTC()
+	summary.ClosedAt = now
 	summary.Status = "closed"
 	summary.Notes = strings.TrimSpace(input.Notes)
-	_, err = s.db.Exec(`
+	if summary.Notes == "" {
+		summary.Notes = fmt.Sprintf("Closed by %s", approval.ApprovedBy)
+	}
+	_, err = tx.Exec(`
 		INSERT INTO day_closes (
 			id, business_date, closed_at, status, sales_total, cash_expected, cash_counted, cash_variance,
 			upi_total, card_total, razorpay_total, refund_total, void_count, discount_total, notes
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(business_date) DO UPDATE SET
-			closed_at = excluded.closed_at,
-			status = excluded.status,
-			sales_total = excluded.sales_total,
-			cash_expected = excluded.cash_expected,
-			cash_counted = excluded.cash_counted,
-			cash_variance = excluded.cash_variance,
-			upi_total = excluded.upi_total,
-			card_total = excluded.card_total,
-			razorpay_total = excluded.razorpay_total,
-			refund_total = excluded.refund_total,
-			void_count = excluded.void_count,
-			discount_total = excluded.discount_total,
-			notes = excluded.notes
 	`, summary.ID, summary.BusinessDate, summary.ClosedAt, summary.Status, summary.SalesTotal, summary.CashExpected, summary.CashCounted, summary.CashVariance,
 		summary.UPITotal, summary.CardTotal, summary.RazorpayTotal, summary.RefundTotal, summary.VoidCount, summary.DiscountTotal, summary.Notes)
 	if err != nil {
+		return DayCloseSummary{}, err
+	}
+	if err := insertAuditLogTx(tx, "day_closed", "day_close", summary.BusinessDate, fmt.Sprintf("%s closed with cash variance %.2f", approval.ApprovedBy, summary.CashVariance), now); err != nil {
+		return DayCloseSummary{}, err
+	}
+	if err := insertSyncLog(tx, "day_close", summary.BusinessDate, "close", summary, now); err != nil {
+		return DayCloseSummary{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return DayCloseSummary{}, err
 	}
 	return summary, nil
@@ -1612,6 +1776,27 @@ func (s *Store) vendorDebitNotes() ([]VendorDebitNote, error) {
 }
 
 func (s *Store) dayClosePreview(date string) (DayCloseSummary, error) {
+	if strings.TrimSpace(date) == "" {
+		date = todayDate()
+	}
+	var closed DayCloseSummary
+	err := s.db.QueryRow(`
+		SELECT id, business_date, closed_at, status, sales_total, cash_expected, cash_counted, cash_variance,
+			upi_total, card_total, razorpay_total, refund_total, void_count, discount_total, notes
+		FROM day_closes
+		WHERE business_date = ?
+	`, date).Scan(&closed.ID, &closed.BusinessDate, &closed.ClosedAt, &closed.Status, &closed.SalesTotal, &closed.CashExpected, &closed.CashCounted,
+		&closed.CashVariance, &closed.UPITotal, &closed.CardTotal, &closed.RazorpayTotal, &closed.RefundTotal, &closed.VoidCount, &closed.DiscountTotal, &closed.Notes)
+	if err == nil {
+		return closed, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return DayCloseSummary{}, err
+	}
+	return s.calculateDayClosePreview(date)
+}
+
+func (s *Store) calculateDayClosePreview(date string) (DayCloseSummary, error) {
 	start, end := dayBounds(date)
 	summary := DayCloseSummary{BusinessDate: date, Status: "preview"}
 	if err := s.db.QueryRow(`
@@ -1650,6 +1835,42 @@ func (s *Store) dayClosePreview(date string) (DayCloseSummary, error) {
 		}
 	}
 	return summary, rows.Err()
+}
+
+func ensureDayCanCloseTx(tx *sql.Tx, businessDate string) error {
+	start, end := dayBounds(businessDate)
+	var openInvoices int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM sales
+		WHERE created_at >= ? AND created_at < ?
+			AND status IN ('draft', 'kot_sent')
+	`, start, end).Scan(&openInvoices); err != nil {
+		return err
+	}
+	var openSessions int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM order_sessions
+		WHERE opened_at >= ? AND opened_at < ?
+			AND status IN ('open', 'held')
+	`, start, end).Scan(&openSessions); err != nil {
+		return err
+	}
+	var activeTickets int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM kitchen_tickets kt
+		JOIN sales s ON s.id = kt.sale_id
+		WHERE s.created_at >= ? AND s.created_at < ?
+			AND kt.status IN ('queued', 'preparing', 'ready')
+	`, start, end).Scan(&activeTickets); err != nil {
+		return err
+	}
+	if openInvoices > 0 || openSessions > 0 || activeTickets > 0 {
+		return fmt.Errorf("cannot close %s: %d open bills, %d active tables, %d active KOTs", businessDate, openInvoices, openSessions, activeTickets)
+	}
+	return nil
 }
 
 func (s *Store) seedAccountingDefaultsTx(tx *sql.Tx) error {
@@ -1894,6 +2115,75 @@ func recalcSessionTotalsTx(tx *sql.Tx, sessionID string) error {
 	tax := round2((subtotal + serviceCharge) * taxRate)
 	total := round2(subtotal + serviceCharge + tax)
 	_, err := tx.Exec("UPDATE order_sessions SET subtotal = ?, service_charge = ?, tax_total = ?, total = ? WHERE id = ?", round2(subtotal), serviceCharge, tax, total, sessionID)
+	return err
+}
+
+func syncSessionInvoiceTx(tx *sql.Tx, sessionID string) error {
+	var invoiceID, invoiceStatus string
+	if err := tx.QueryRow(`
+		SELECT os.invoice_id, COALESCE(s.status, '')
+		FROM order_sessions os
+		LEFT JOIN sales s ON s.id = os.invoice_id
+		WHERE os.id = ?
+	`, sessionID).Scan(&invoiceID, &invoiceStatus); err != nil {
+		return err
+	}
+	if invoiceID == "" {
+		return nil
+	}
+	switch invoiceStatus {
+	case invoiceStatusClosed, invoiceStatusRefunded, invoiceStatusPartiallyRefunded, invoiceStatusSplit, invoiceStatusVoided:
+		return fmt.Errorf("cannot change lines on %s invoice", invoiceStatus)
+	}
+
+	rows, err := tx.Query(`
+		SELECT item_id, item_name, quantity, unit_price + modifier_total, line_total, notes
+		FROM order_session_lines
+		WHERE session_id = ? AND status = 'open'
+		ORDER BY rowid
+	`, sessionID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type line struct {
+		itemID, itemName, notes string
+		qty                     int
+		unitPrice, lineTotal    float64
+	}
+	lines := make([]line, 0)
+	for rows.Next() {
+		var item line
+		if err := rows.Scan(&item.itemID, &item.itemName, &item.qty, &item.unitPrice, &item.lineTotal, &item.notes); err != nil {
+			return err
+		}
+		lines = append(lines, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec("DELETE FROM sale_lines WHERE sale_id = ?", invoiceID); err != nil {
+		return err
+	}
+	for _, line := range lines {
+		if _, err := tx.Exec(`
+			INSERT INTO sale_lines (id, sale_id, item_id, item_name, quantity, unit_price, line_total, notes)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, mustID(), invoiceID, line.itemID, line.itemName, line.qty, line.unitPrice, line.lineTotal, line.notes); err != nil {
+			return err
+		}
+	}
+
+	var subtotal, serviceCharge, taxTotal, total float64
+	if err := tx.QueryRow("SELECT subtotal, service_charge, tax_total, total FROM order_sessions WHERE id = ?", sessionID).Scan(&subtotal, &serviceCharge, &taxTotal, &total); err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+		UPDATE sales
+		SET subtotal = ?, tax_total = ?, total = ?
+		WHERE id = ?
+	`, round2(subtotal+serviceCharge), taxTotal, total, invoiceID)
 	return err
 }
 

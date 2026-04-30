@@ -56,6 +56,20 @@ func (a *App) GetAdminAnalytics(rangeKey string) (nexus.AdminAnalytics, error) {
 	return a.store.GetAdminAnalytics(rangeKey)
 }
 
+func (a *App) AuthenticateStaff(input nexus.StaffLoginInput) (nexus.StaffSession, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.StaffSession{}, err
+	}
+	return a.store.AuthenticateStaff(input)
+}
+
+func (a *App) AuthorizeStaffAction(input nexus.StaffActionApprovalInput) (nexus.ApprovalToken, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.ApprovalToken{}, err
+	}
+	return a.store.AuthorizeStaffAction(input)
+}
+
 func (a *App) RecordSale(input nexus.SaleInput) (nexus.Dashboard, error) {
 	if err := a.ensureReady(); err != nil {
 		return nexus.Dashboard{}, err
@@ -266,6 +280,13 @@ func (a *App) AddOrderSessionLine(input nexus.AddOrderSessionLineInput) (nexus.O
 	return a.store.AddOrderSessionLine(input)
 }
 
+func (a *App) VoidOrderSessionLine(input nexus.SessionLineVoidInput) (nexus.OrderSessionDetail, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.OrderSessionDetail{}, err
+	}
+	return a.store.VoidOrderSessionLine(input)
+}
+
 func (a *App) TransferOrderSession(input nexus.TableMoveInput) (nexus.OrderSessionDetail, error) {
 	if err := a.ensureReady(); err != nil {
 		return nexus.OrderSessionDetail{}, err
@@ -397,6 +418,20 @@ func (a *App) ExportDayClosePDF(businessDate string) (nexus.ExportResult, error)
 		return nexus.ExportResult{}, err
 	}
 	return a.store.ExportDayClosePDF(businessDate)
+}
+
+func (a *App) GetSyncStatus() (nexus.SyncStatus, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.SyncStatus{}, err
+	}
+	return a.store.GetSyncStatus()
+}
+
+func (a *App) ExportBackup(input nexus.BackupInput) (nexus.ExportResult, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.ExportResult{}, err
+	}
+	return a.store.ExportBackup(input)
 }
 
 func (a *App) SaveVendor(input nexus.VendorInput) (nexus.PilotWorkspace, error) {

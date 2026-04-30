@@ -21,11 +21,13 @@
 }
 
 .boot-screen,
+.login-shell,
 .app-shell {
     min-height: 100vh;
 }
 
-.boot-screen {
+.boot-screen,
+.login-shell {
     display: grid;
     place-items: center;
     background: var(--bg);
@@ -51,6 +53,46 @@
 .boot-card p {
     margin: 0 0 22px;
     color: var(--muted);
+}
+
+.login-panel {
+    width: min(520px, calc(100vw - 36px));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.login-form {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.workspace-login-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.workspace-login-grid button {
+    min-height: 72px;
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+    color: var(--ink);
+    text-align: left;
+}
+
+.workspace-login-grid button.active {
+    border-color: rgba(31, 138, 112, 0.35);
+    background: rgba(31, 138, 112, 0.1);
+    color: var(--brand);
+}
+
+.workspace-login-grid strong,
+.workspace-login-grid span {
+    display: block;
 }
 
 .app-shell {
@@ -255,6 +297,30 @@ textarea {
     gap: 8px;
 }
 
+.operator-chip {
+    min-width: 132px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 6px 10px;
+}
+
+.operator-chip span,
+.operator-chip strong {
+    display: block;
+}
+
+.operator-chip span {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.operator-chip strong {
+    color: var(--ink);
+    font-size: 13px;
+}
+
 button {
     min-height: 36px;
     border: 0;
@@ -279,6 +345,24 @@ button:disabled {
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--brand);
+}
+
+.ghost-button.compact {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 12px;
+}
+
+.toolbar-row,
+.approval-strip {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.approval-strip {
+    grid-template-columns: minmax(120px, 0.55fr) minmax(160px, 1fr);
+    margin-top: 12px;
 }
 
 .error-strip {
@@ -2061,6 +2145,7 @@ textarea:focus {
 
     .metric-grid,
     .workspace-switcher,
+    .workspace-login-grid,
     .kds-command,
     .admin-metric-grid,
     .matrix-grid,
@@ -2088,6 +2173,10 @@ textarea:focus {
     .item-master-row,
     .item-master-controls,
     .recipe-line {
+        grid-template-columns: 1fr;
+    }
+
+    .approval-strip {
         grid-template-columns: 1fr;
     }
 

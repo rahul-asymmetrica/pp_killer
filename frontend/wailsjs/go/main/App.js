@@ -6,6 +6,14 @@ export function AddOrderSessionLine(arg1) {
   return window['go']['main']['App']['AddOrderSessionLine'](arg1);
 }
 
+export function AuthenticateStaff(arg1) {
+  return window['go']['main']['App']['AuthenticateStaff'](arg1);
+}
+
+export function AuthorizeStaffAction(arg1) {
+  return window['go']['main']['App']['AuthorizeStaffAction'](arg1);
+}
+
 export function CancelPaymentRequest(arg1) {
   return window['go']['main']['App']['CancelPaymentRequest'](arg1);
 }
@@ -32,6 +40,10 @@ export function CreatePurchaseOrder(arg1) {
 
 export function ExportAccountingCSV() {
   return window['go']['main']['App']['ExportAccountingCSV']();
+}
+
+export function ExportBackup(arg1) {
+  return window['go']['main']['App']['ExportBackup'](arg1);
 }
 
 export function ExportDayClosePDF(arg1) {
@@ -80,6 +92,10 @@ export function GetOrderSessionDetail(arg1) {
 
 export function GetPilotWorkspace() {
   return window['go']['main']['App']['GetPilotWorkspace']();
+}
+
+export function GetSyncStatus() {
+  return window['go']['main']['App']['GetSyncStatus']();
 }
 
 export function ImportMenuCSV(arg1) {
@@ -228,4 +244,8 @@ export function ValidateManagerPIN(arg1) {
 
 export function VoidInvoice(arg1) {
   return window['go']['main']['App']['VoidInvoice'](arg1);
+}
+
+export function VoidOrderSessionLine(arg1) {
+  return window['go']['main']['App']['VoidOrderSessionLine'](arg1);
 }

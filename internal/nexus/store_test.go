@@ -150,6 +150,78 @@ func TestRefundRequiresPINAndWritesReversalRecords(t *testing.T) {
 	}
 }
 
+func TestStaffAuthenticationAndActionPermissions(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	session, err := store.AuthenticateStaff(StaffLoginInput{StaffID: "staff_manager", PIN: "1234", Workspace: "admin"})
+	if err != nil {
+		t.Fatalf("authenticate manager: %v", err)
+	}
+	if session.Role != "manager" || !containsString(session.WorkspaceAccess, "admin") || !containsString(session.Permissions, "invoice:void") {
+		t.Fatalf("unexpected manager session: %#v", session)
+	}
+	if _, err := store.AuthenticateStaff(StaffLoginInput{StaffID: "staff_waiter", PIN: "1234", Workspace: "admin"}); err == nil {
+		t.Fatalf("expected waiter admin login to be rejected")
+	}
+	if _, err := store.AuthenticateStaff(StaffLoginInput{StaffID: "staff_manager", PIN: "0000", Workspace: "admin"}); err == nil {
+		t.Fatalf("expected invalid staff PIN to fail")
+	}
+	if _, err := store.AuthorizeStaffAction(StaffActionApprovalInput{StaffID: "staff_cashier", PIN: "1234", Action: "close_day", TargetID: todayDate()}); err != nil {
+		t.Fatalf("cashier should be able to approve day close: %v", err)
+	}
+	if _, err := store.AuthorizeStaffAction(StaffActionApprovalInput{StaffID: "staff_cashier", PIN: "1234", Action: "line_void", TargetID: "line"}); err == nil {
+		t.Fatalf("expected cashier line void approval to fail")
+	}
+}
+
+func TestSessionLineVoidRequiresApprovalAndSyncsTicketInvoice(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	detail, err := store.OpenOrderSession(OpenOrderSessionInput{TableID: "tbl_01", WaiterID: "staff_waiter", GuestCount: 2, ServiceMode: "dine_in"})
+	if err != nil {
+		t.Fatalf("open session: %v", err)
+	}
+	detail, err = store.AddOrderSessionLine(AddOrderSessionLineInput{SessionID: detail.Session.ID, ItemID: "item_latte", Quantity: 1})
+	if err != nil {
+		t.Fatalf("add line: %v", err)
+	}
+	lineID := detail.Lines[0].ID
+	detail, err = store.SendOrderSessionKOT(detail.Session.ID)
+	if err != nil {
+		t.Fatalf("send session KOT: %v", err)
+	}
+	if detail.Session.InvoiceID == "" {
+		t.Fatalf("expected session invoice after KOT")
+	}
+
+	if _, err := store.VoidOrderSessionLine(SessionLineVoidInput{SessionID: detail.Session.ID, LineID: lineID, PIN: "0000", Reason: "Guest changed"}); err == nil {
+		t.Fatalf("expected invalid line void PIN to fail")
+	}
+	detail, err = store.VoidOrderSessionLine(SessionLineVoidInput{SessionID: detail.Session.ID, LineID: lineID, StaffID: "staff_manager", PIN: "1234", Reason: "Guest changed"})
+	if err != nil {
+		t.Fatalf("void session line: %v", err)
+	}
+	if detail.Session.Total != 0 || detail.Lines[0].Status != "voided" || detail.Lines[0].KOTStatus != "cancelled" {
+		t.Fatalf("expected voided zero-value session, got %#v", detail)
+	}
+	invoice, err := store.GetInvoiceDetail(detail.Session.InvoiceID)
+	if err != nil {
+		t.Fatalf("get session invoice: %v", err)
+	}
+	if len(invoice.Lines) != 0 || invoice.Summary.Total != 0 {
+		t.Fatalf("expected invoice lines to sync after void, got %#v", invoice)
+	}
+	var cancelled int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM kitchen_ticket_lines WHERE status = 'cancelled'").Scan(&cancelled); err != nil {
+		t.Fatalf("query cancelled lines: %v", err)
+	}
+	if cancelled == 0 {
+		t.Fatalf("expected KOT line to be cancelled")
+	}
+}
+
 func TestItemSplitPreservesTotalsAndLinksInvoices(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
@@ -772,7 +844,11 @@ func TestDayCloseAndAccountingShell(t *testing.T) {
 	defer store.Close()
 
 	invoice := closeDraftOrder(t, store, []SaleLineInput{{ItemID: "item_latte", Quantity: 1}})
-	summary, err := store.CloseDay(DayCloseInput{BusinessDate: todayDate(), CashCounted: invoice.Total, Notes: "Test close"})
+	serveInvoiceTickets(t, store, invoice.ID)
+	if _, err := store.CloseDay(DayCloseInput{BusinessDate: todayDate(), CashCounted: invoice.Total, PIN: "0000", Notes: "Test close"}); err == nil {
+		t.Fatalf("expected invalid close day PIN to fail")
+	}
+	summary, err := store.CloseDay(DayCloseInput{BusinessDate: todayDate(), CashCounted: invoice.Total, PIN: "1234", Notes: "Test close"})
 	if err != nil {
 		t.Fatalf("close day: %v", err)
 	}
@@ -785,6 +861,21 @@ func TestDayCloseAndAccountingShell(t *testing.T) {
 	}
 	if snapshot.VoucherCount == 0 || snapshot.SalesTotal <= 0 || len(snapshot.TrialBalance) == 0 {
 		t.Fatalf("expected accounting snapshot, got %#v", snapshot)
+	}
+	if _, err := store.SaveOrder(SaleInput{
+		CustomerName:  "Locked Guest",
+		Channel:       "counter",
+		OrderType:     "dine_in",
+		PaymentMethod: "cash",
+		Lines:         []SaleLineInput{{ItemID: "item_latte", Quantity: 1}},
+	}); err == nil {
+		t.Fatalf("expected closed business date to reject new sales")
+	}
+	if _, err := store.RefundInvoice(RefundInvoiceInput{InvoiceID: invoice.ID, PIN: "1234", Amount: 10, Reason: "After close"}); err == nil {
+		t.Fatalf("expected closed business date to reject refunds")
+	}
+	if _, err := store.CloseDay(DayCloseInput{BusinessDate: todayDate(), CashCounted: invoice.Total, PIN: "1234"}); err == nil {
+		t.Fatalf("expected duplicate close day to fail")
 	}
 }
 
@@ -1060,6 +1151,31 @@ func TestPrinterConnectionAndExports(t *testing.T) {
 	}
 }
 
+func TestSyncStatusAndBackupExport(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	_ = closeDraftOrder(t, store, []SaleLineInput{{ItemID: "item_latte", Quantity: 1}})
+	status, err := store.GetSyncStatus()
+	if err != nil {
+		t.Fatalf("sync status: %v", err)
+	}
+	if status.PendingCount == 0 || status.DatabaseBytes == 0 || status.DatabasePath == "" {
+		t.Fatalf("expected pending sync and db metadata, got %#v", status)
+	}
+
+	backup, err := store.ExportBackup(BackupInput{Destination: t.TempDir()})
+	if err != nil {
+		t.Fatalf("export backup: %v", err)
+	}
+	if backup.Kind != "sqlite_backup" || backup.Bytes == 0 {
+		t.Fatalf("unexpected backup result: %#v", backup)
+	}
+	if _, err := os.Stat(backup.Path); err != nil {
+		t.Fatalf("expected backup file: %v", err)
+	}
+}
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := Open(filepath.Join(t.TempDir(), "nexus.db"))
@@ -1126,6 +1242,32 @@ func closeDraftOrder(t *testing.T, store *Store, lines []SaleLineInput) InvoiceS
 		t.Fatalf("get closed detail: %v", err)
 	}
 	return detail.Summary
+}
+
+func serveInvoiceTickets(t *testing.T, store *Store, invoiceID string) {
+	t.Helper()
+	rows, err := store.db.Query("SELECT id FROM kitchen_tickets WHERE sale_id = ?", invoiceID)
+	if err != nil {
+		t.Fatalf("query tickets: %v", err)
+	}
+	defer rows.Close()
+
+	var ticketIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			t.Fatalf("scan ticket: %v", err)
+		}
+		ticketIDs = append(ticketIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read tickets: %v", err)
+	}
+	for _, id := range ticketIDs {
+		if _, err := store.UpdateKOTStatus(id, "served"); err != nil {
+			t.Fatalf("serve ticket: %v", err)
+		}
+	}
 }
 
 func metricValue(metrics []AnalyticsMetric, id string) float64 {

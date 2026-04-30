@@ -156,6 +156,9 @@ func (s *Store) VoidInvoice(input VoidInvoiceInput) (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, summary.CreatedAt); err != nil {
+		return Dashboard{}, err
+	}
 	var ticketCount int
 	if err := tx.QueryRow("SELECT COUNT(*) FROM kitchen_tickets WHERE sale_id = ?", input.InvoiceID).Scan(&ticketCount); err != nil {
 		return Dashboard{}, err
@@ -202,6 +205,9 @@ func (s *Store) RefundInvoice(input RefundInvoiceInput) (Dashboard, error) {
 	}
 	summary, err := invoiceSummaryByIDTx(tx, input.InvoiceID)
 	if err != nil {
+		return Dashboard{}, err
+	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, summary.CreatedAt); err != nil {
 		return Dashboard{}, err
 	}
 	if summary.Status != invoiceStatusClosed && summary.Status != invoiceStatusPartiallyRefunded {
@@ -277,6 +283,13 @@ func (s *Store) SplitInvoice(input SplitInvoiceInput) (Dashboard, error) {
 	mode := strings.ToLower(strings.TrimSpace(input.Mode))
 	if mode == "" {
 		mode = "items"
+	}
+	summary, err := invoiceSummaryByIDTx(tx, input.InvoiceID)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, summary.CreatedAt); err != nil {
+		return Dashboard{}, err
 	}
 	switch mode {
 	case "items", "item":
@@ -474,6 +487,9 @@ func createInvoiceTx(tx *sql.Tx, input SaleInput, createdAt string) (string, str
 	if strings.TrimSpace(input.PaymentMethod) == "" {
 		input.PaymentMethod = "cash"
 	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, createdAt); err != nil {
+		return "", "", 0, err
+	}
 
 	invoiceID := mustID()
 	invoiceNumber, err := nextDocumentNumber(tx, "invoice_prefix", "next_invoice_seq")
@@ -562,6 +578,9 @@ func sendKOTTx(tx *sql.Tx, invoiceID string, createdAt string) error {
 	}
 	if summary.Status == invoiceStatusVoided || summary.Status == invoiceStatusRefunded || summary.Status == invoiceStatusSplit {
 		return fmt.Errorf("cannot send KOT for %s invoice", summary.Status)
+	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, summary.CreatedAt); err != nil {
+		return err
 	}
 
 	var existingTickets int
@@ -662,6 +681,9 @@ func closeInvoiceTx(tx *sql.Tx, input CloseInvoiceInput, createdAt string) error
 	}
 	if summary.Status == invoiceStatusVoided || summary.Status == invoiceStatusRefunded || summary.Status == invoiceStatusSplit {
 		return fmt.Errorf("cannot close %s invoice", summary.Status)
+	}
+	if err := ensureTimestampBusinessDateOpenTx(tx, summary.CreatedAt); err != nil {
+		return err
 	}
 	if summary.Status == invoiceStatusDraft && summary.Total <= 0 {
 		return errors.New("cannot close an empty invoice")

@@ -543,7 +543,9 @@ CREATE TABLE IF NOT EXISTS sync_log (
 	payload TEXT NOT NULL,
 	status TEXT NOT NULL,
 	created_at TEXT NOT NULL,
-	synced_at TEXT NOT NULL DEFAULT ''
+	synced_at TEXT NOT NULL DEFAULT '',
+	attempts INTEGER NOT NULL DEFAULT 0,
+	last_error TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS marketing_drafts (
@@ -656,6 +658,8 @@ func (s *Store) migrate() error {
 		{"sale_lines", "notes", "TEXT NOT NULL DEFAULT ''"},
 		{"order_session_lines", "kot_status", "TEXT NOT NULL DEFAULT 'not_sent'"},
 		{"notification_queue", "read_at", "TEXT NOT NULL DEFAULT ''"},
+		{"sync_log", "attempts", "INTEGER NOT NULL DEFAULT 0"},
+		{"sync_log", "last_error", "TEXT NOT NULL DEFAULT ''"},
 	}
 	for _, column := range columns {
 		if err := s.addColumnIfMissing(column.table, column.name, column.definition); err != nil {
@@ -1207,6 +1211,9 @@ func (s *Store) ReceiveDelivery(input DeliveryInput) (Dashboard, error) {
 		return Dashboard{}, err
 	}
 	defer rollback(tx)
+	if err := ensureBusinessDateOpenTx(tx, todayDate()); err != nil {
+		return Dashboard{}, err
+	}
 
 	batchID := mustID()
 	createdAt := nowUTC()
@@ -1304,6 +1311,9 @@ func (s *Store) ReconcileStock(input ReconcileInput) (Dashboard, error) {
 		return Dashboard{}, err
 	}
 	defer rollback(tx)
+	if err := ensureBusinessDateOpenTx(tx, todayDate()); err != nil {
+		return Dashboard{}, err
+	}
 
 	var current, wasteFactor float64
 	var lastAuditAt string

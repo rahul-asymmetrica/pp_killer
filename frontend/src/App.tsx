@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState, type CSSProperties, type ReactNode} from '
 import './App.css';
 import {
     AddOrderSessionLine,
+    AuthenticateStaff,
     CancelPaymentRequest,
     CloseInvoice,
     CloseOrderSession,
@@ -9,6 +10,7 @@ import {
     CreatePaymentRequest,
     CreatePurchaseOrder,
     ExportAccountingCSV,
+    ExportBackup,
     ExportDayClosePDF,
     ExportInvoicePDF,
     ExportInvoicesCSV,
@@ -18,6 +20,7 @@ import {
     GetInvoiceDetail,
     GetInvoices,
     GetNotifications,
+    GetSyncStatus,
     GetOrderSessionDetail,
     ImportMenuCSV,
     LinkModifierToItem,
@@ -54,6 +57,7 @@ import {
     UpdateRecipe,
     ValidateManagerPIN,
     VoidInvoice,
+    VoidOrderSessionLine,
 } from '../wailsjs/go/main/App';
 import {nexus} from '../wailsjs/go/models';
 import {WindowFullscreen} from '../wailsjs/runtime/runtime';
@@ -343,6 +347,22 @@ type StaffMember = {
     status: string;
 };
 
+type StaffSession = {
+    staffId: string;
+    name: string;
+    role: string;
+    permissions: string[];
+    workspaceAccess: WorkspaceKey[];
+    issuedAt: string;
+    expiresAt: string;
+};
+
+type LoginDraft = {
+    staffId: string;
+    pin: string;
+    workspace: WorkspaceKey;
+};
+
 type AuditLogEntry = {
     id: string;
     eventType: string;
@@ -358,6 +378,19 @@ type StaffDraft = {
     role: string;
     pin: string;
     status: string;
+};
+
+type SyncStatus = {
+    pendingCount: number;
+    syncedCount: number;
+    failedCount: number;
+    oldestPendingAt: string;
+    lastSyncedAt: string;
+    lastError: string;
+    databasePath: string;
+    databaseBytes: number;
+    walBytes: number;
+    updatedAt: string;
 };
 
 type MenuCategory = {
@@ -830,6 +863,9 @@ function App() {
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetail | null>(null);
     const [selectedSession, setSelectedSession] = useState<OrderSessionDetail | null>(null);
+    const [currentStaff, setCurrentStaff] = useState<StaffSession | null>(null);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+    const [loginDraft, setLoginDraft] = useState<LoginDraft>({staffId: '', pin: '', workspace: 'front'});
     const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>('front');
     const [activePage, setActivePage] = useState<PageKey>('home');
     const [analyticsRange, setAnalyticsRange] = useState('30d');
@@ -846,11 +882,15 @@ function App() {
     const [discountValue, setDiscountValue] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [paymentTendered, setPaymentTendered] = useState(0);
+    const [menuSearch, setMenuSearch] = useState('');
 
     const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all');
     const [invoiceSearch, setInvoiceSearch] = useState('');
     const [invoicePaymentFilter, setInvoicePaymentFilter] = useState('all');
     const [managerPIN, setManagerPIN] = useState('');
+    const [dayClosePIN, setDayClosePIN] = useState('');
+    const [lineVoidPIN, setLineVoidPIN] = useState('');
+    const [lineVoidReason, setLineVoidReason] = useState('');
     const [actionReason, setActionReason] = useState('');
     const [refundAmount, setRefundAmount] = useState(0);
     const [splitMode, setSplitMode] = useState<'items' | 'amount'>('items');
@@ -1011,6 +1051,26 @@ function App() {
     }, [floorWaiterId, pilot]);
 
     useEffect(() => {
+        if (!pilot) return;
+        setLoginDraft((current) => {
+            const activeStaff = pilot.staff.filter((member) => member.status === 'active');
+            const selected = activeStaff.find((member) => member.id === current.staffId) ?? activeStaff.find((member) => member.role === 'manager') ?? activeStaff[0];
+            if (!selected) return current;
+            const access = workspaceAccessForRole(selected.role);
+            const workspace = access.includes(current.workspace) ? current.workspace : access[0] ?? 'front';
+            if (current.staffId === selected.id && current.workspace === workspace) return current;
+            return {...current, staffId: selected.id, workspace};
+        });
+    }, [pilot]);
+
+    useEffect(() => {
+        if (!currentStaff) return;
+        if (currentStaff.workspaceAccess.includes(activeWorkspace)) return;
+        const nextWorkspace = currentStaff.workspaceAccess[0] ?? 'front';
+        switchWorkspace(nextWorkspace);
+    }, [activeWorkspace, currentStaff]);
+
+    useEffect(() => {
         if (!pilot || orderType !== 'dine_in') return;
         if (tableName && pilot.tables.some((table) => table.name === tableName)) return;
         const preferred = pilot.tables.find((table) => table.status === 'available') ?? pilot.tables[0];
@@ -1043,6 +1103,10 @@ function App() {
     const topSignals = useMemo(() => [...(dashboard?.signals ?? [])].sort((a, b) => a.priority - b.priority).slice(0, 4), [dashboard]);
     const currentPage = useMemo(() => pages.find((page) => page.key === activePage) ?? pages[0], [activePage]);
     const currentWorkspace = useMemo(() => workspaces.find((workspace) => workspace.key === activeWorkspace) ?? workspaces[0], [activeWorkspace]);
+    const availableWorkspaces = useMemo(() => {
+        const access = currentStaff?.workspaceAccess ?? [];
+        return access.length > 0 ? workspaces.filter((workspace) => access.includes(workspace.key)) : workspaces;
+    }, [currentStaff]);
 
     const cartTotals = useMemo(() => {
         const subtotal = cart.reduce((sum, line) => {
@@ -1068,15 +1132,17 @@ function App() {
     async function refreshAll() {
         setError('');
         try {
-            const [nextDashboard, nextNotifications, nextPilot, nextAnalytics] = await Promise.all([
+            const [nextDashboard, nextNotifications, nextPilot, nextAnalytics, nextSyncStatus] = await Promise.all([
                 GetDashboard(),
                 GetNotifications(),
                 GetPilotWorkspace(),
                 GetAdminAnalytics(analyticsRange),
+                GetSyncStatus(),
             ]);
             setDashboard(normalizeDashboard(nextDashboard as Dashboard));
             setNotifications(nextNotifications as NotificationRecord[] ?? []);
             setAnalytics(normalizeAdminAnalytics(nextAnalytics as AdminAnalytics));
+            setSyncStatus(normalizeSyncStatus(nextSyncStatus as SyncStatus));
             const normalizedPilot = normalizePilotWorkspace(nextPilot as PilotWorkspace);
             setPilot(normalizedPilot);
             setSettingsDraft(normalizedPilot.settings);
@@ -1147,7 +1213,43 @@ function App() {
         }, 4200);
     }
 
+    async function signIn() {
+        setBusy('login');
+        setError('');
+        try {
+            const session = await AuthenticateStaff(new nexus.StaffLoginInput({
+                staffId: loginDraft.staffId,
+                pin: loginDraft.pin,
+                workspace: loginDraft.workspace,
+            }));
+            const normalized = normalizeStaffSession(session as StaffSession);
+            setCurrentStaff(normalized);
+            const workspace = normalized.workspaceAccess.includes(loginDraft.workspace) ? loginDraft.workspace : normalized.workspaceAccess[0] ?? 'front';
+            switchWorkspace(workspace);
+            setLoginDraft((current) => ({...current, pin: '', workspace}));
+            pushToast('success', 'Signed in', `${normalized.name} / ${humanStatus(normalized.role)}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
+            pushToast('error', 'Sign in failed', message);
+        } finally {
+            setBusy('');
+        }
+    }
+
+    function signOut() {
+        setCurrentStaff(null);
+        setManagerPIN('');
+        setDayClosePIN('');
+        setLineVoidPIN('');
+        setLoginDraft((current) => ({...current, pin: '', workspace: 'front'}));
+    }
+
     function switchWorkspace(workspaceKey: WorkspaceKey) {
+        if (currentStaff && !currentStaff.workspaceAccess.includes(workspaceKey)) {
+            pushToast('error', 'Workspace locked', `${currentStaff.name} cannot access ${workspaceLabel(workspaceKey)}`);
+            return;
+        }
         const workspace = workspaces.find((item) => item.key === workspaceKey) ?? workspaces[0];
         setActiveWorkspace(workspace.key);
         setActivePage(workspace.defaultPage);
@@ -1156,7 +1258,13 @@ function App() {
     function navigateToPage(pageKey: PageKey) {
         const page = pages.find((item) => item.key === pageKey);
         const workspace = page?.workspaces.includes(activeWorkspace) ? activeWorkspace : page?.workspaces[0];
-        if (workspace) setActiveWorkspace(workspace);
+        if (workspace) {
+            if (currentStaff && !currentStaff.workspaceAccess.includes(workspace)) {
+                pushToast('error', 'Workspace locked', `${currentStaff.name} cannot access ${workspaceLabel(workspace)}`);
+                return;
+            }
+            setActiveWorkspace(workspace);
+        }
         setActivePage(pageKey);
     }
 
@@ -1284,6 +1392,21 @@ function App() {
         });
     }
 
+    function voidSessionLine(lineID: string) {
+        if (!selectedSession) return;
+        return runAction(`session-line-void-${lineID}`, 'Line voided', async () => {
+            const detail = await VoidOrderSessionLine(new nexus.SessionLineVoidInput({
+                sessionId: selectedSession.session.id,
+                lineId: lineID,
+                staffId: currentStaff && ['owner', 'manager'].includes(currentStaff.role) ? currentStaff.staffId : '',
+                pin: lineVoidPIN || managerPIN,
+                reason: lineVoidReason || 'Guest changed order',
+            }));
+            setSelectedSession(normalizeOrderSessionDetail(detail as OrderSessionDetail));
+            setLineVoidReason('');
+        });
+    }
+
     function transferSession(targetTableID: string) {
         if (!selectedSession) return;
         return runAction(`transfer-${targetTableID}`, 'Table transferred', async () => {
@@ -1388,6 +1511,12 @@ function App() {
 
     function exportDayClosePDF() {
         return runFileAction('dayclose-pdf', 'Day close PDF saved', () => ExportDayClosePDF(pilot?.dayClose.businessDate || new Date().toISOString().slice(0, 10)));
+    }
+
+    function exportBackup() {
+        return runFileAction('backup', 'Backup saved', () => ExportBackup(new nexus.BackupInput({
+            destination: settingsDraft?.backupPath || '',
+        })));
     }
 
     function savePrinter() {
@@ -1658,7 +1787,9 @@ function App() {
         return runAction('close-day', 'Day closed', () => CloseDay(new nexus.DayCloseInput({
             businessDate: pilot?.dayClose.businessDate || new Date().toISOString().slice(0, 10),
             cashCounted: dayCloseCash,
-            notes: 'Pilot close run',
+            notes: 'Operator close run',
+            staffId: currentStaff?.staffId || '',
+            pin: dayClosePIN || managerPIN,
         })));
     }
 
@@ -1675,6 +1806,10 @@ function App() {
         const name = staffDraft.name.trim();
         if (!name) {
             pushToast('error', 'Staff name missing', 'Add the person before saving');
+            return;
+        }
+        if (!staffDraft.pin.trim()) {
+            pushToast('error', 'Staff PIN missing', 'Add a login PIN for this staff member');
             return;
         }
         return runAction('save-staff', 'Staff saved', async () => {
@@ -1807,6 +1942,20 @@ function App() {
         );
     }
 
+    if (!currentStaff) {
+        return (
+            <LoginScreen
+                restaurant={dashboard.restaurant}
+                staff={pilot.staff}
+                draft={loginDraft}
+                busy={busy}
+                error={error}
+                onDraft={setLoginDraft}
+                onSignIn={signIn}
+            />
+        );
+    }
+
     return (
         <main className={`app-shell workspace-${activeWorkspace}`}>
             <aside className="sidebar">
@@ -1819,7 +1968,7 @@ function App() {
                 </div>
 
                 <div className="workspace-switcher" aria-label="Role workspace">
-                    {workspaces.map((workspace) => (
+                    {availableWorkspaces.map((workspace) => (
                         <button
                             type="button"
                             className={activeWorkspace === workspace.key ? 'active' : ''}
@@ -1852,8 +2001,8 @@ function App() {
 
                 <div className="sync-card">
                     <span>Local queue</span>
-                    <strong>{dashboard.metrics.pendingSyncItems}</strong>
-                    <small>{dashboard.metrics.openKots} KOTs / {pilot.printJobs.length} print jobs</small>
+                    <strong>{syncStatus?.pendingCount ?? dashboard.metrics.pendingSyncItems}</strong>
+                    <small>{syncStatus?.failedCount ?? 0} failed / {pilot.printJobs.length} print jobs</small>
                 </div>
             </aside>
 
@@ -1865,8 +2014,13 @@ function App() {
                         <p>{currentWorkspace.detail}</p>
                     </div>
                     <div className="topbar-actions">
+                        <div className="operator-chip">
+                            <span>{humanStatus(currentStaff.role)}</span>
+                            <strong>{currentStaff.name}</strong>
+                        </div>
                         <button className="ghost-button" type="button" onClick={() => WindowFullscreen()}>Full Screen</button>
                         <button className="ghost-button" type="button" onClick={refreshAll} disabled={busy === 'refresh'}>Refresh</button>
+                        <button className="ghost-button" type="button" onClick={signOut}>Sign Out</button>
                     </div>
                 </header>
 
@@ -1905,6 +2059,7 @@ function App() {
                         discountValue={discountValue}
                         paymentMethod={paymentMethod}
                         paymentTendered={paymentTendered}
+                        menuSearch={menuSearch}
                         busy={busy}
                         openOrders={openOrders}
                         onAddToCart={addToCart}
@@ -1917,6 +2072,7 @@ function App() {
                         onDiscountValue={setDiscountValue}
                         onPaymentMethod={setPaymentMethod}
                         onPaymentTendered={setPaymentTendered}
+                        onMenuSearch={setMenuSearch}
                         onSaveDraft={saveDraft}
                         onQuickClose={quickCloseBill}
                         onClearCart={clearCart}
@@ -1935,14 +2091,21 @@ function App() {
                         busy={busy}
                         floorWaiterId={floorWaiterId}
                         floorGuestCount={floorGuestCount}
+                        menuSearch={menuSearch}
+                        lineVoidPIN={lineVoidPIN}
+                        lineVoidReason={lineVoidReason}
                         onFloorWaiter={setFloorWaiterId}
                         onFloorGuestCount={setFloorGuestCount}
+                        onMenuSearch={setMenuSearch}
+                        onLineVoidPIN={setLineVoidPIN}
+                        onLineVoidReason={setLineVoidReason}
                         onOpenTable={openTable}
                         onOpenSession={openSession}
                         onAddSessionItem={addSessionItem}
                         onTransferSession={transferSession}
                         onSendKOT={sendSessionKOT}
                         onCloseSession={closeSession}
+                        onVoidLine={voidSessionLine}
                     />
                 )}
 
@@ -2108,8 +2271,10 @@ function App() {
                     <DayClosePage
                         summary={pilot.dayClose}
                         cashCounted={dayCloseCash}
+                        closePIN={dayClosePIN}
                         busy={busy}
                         onCashCounted={setDayCloseCash}
+                        onClosePIN={setDayClosePIN}
                         onCloseDay={closeDayNow}
                         onExportPDF={exportDayClosePDF}
                     />
@@ -2129,6 +2294,7 @@ function App() {
                         metrics={dashboard.metrics}
                         notifications={notifications}
                         pilot={pilot}
+                        syncStatus={syncStatus}
                         settingsDraft={settingsDraft}
                         staffDraft={staffDraft}
                         busy={busy}
@@ -2137,9 +2303,82 @@ function App() {
                         onStaffDraft={setStaffDraft}
                         onSaveStaff={saveStaffDraft}
                         onUpdateStaffStatus={updateStaffStatus}
+                        onExportBackup={exportBackup}
                         readinessItems={buildReadinessItems(dashboard, pilot)}
                     />
                 )}
+            </section>
+        </main>
+    );
+}
+
+function LoginScreen({restaurant, staff, draft, busy, error, onDraft, onSignIn}: {
+    restaurant: Restaurant;
+    staff: StaffMember[];
+    draft: LoginDraft;
+    busy: string;
+    error: string;
+    onDraft: (value: LoginDraft | ((current: LoginDraft) => LoginDraft)) => void;
+    onSignIn: () => void;
+}) {
+    const activeStaff = staff.filter((member) => member.status === 'active');
+    const selected = activeStaff.find((member) => member.id === draft.staffId) ?? activeStaff[0];
+    const allowedWorkspaces = workspaceAccessForRole(selected?.role ?? 'waiter');
+    return (
+        <main className="login-shell">
+            <section className="login-panel">
+                <div className="brand-lockup">
+                    <div className="brand-mark">NX</div>
+                    <div>
+                        <strong>NEXUS</strong>
+                        <span>{restaurant.name}</span>
+                    </div>
+                </div>
+                <form
+                    className="login-form"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        void onSignIn();
+                    }}
+                >
+                    <Field label="Staff">
+                        <select
+                            value={selected?.id ?? ''}
+                            onChange={(event) => {
+                                const nextStaff = activeStaff.find((member) => member.id === event.target.value);
+                                const nextAccess = workspaceAccessForRole(nextStaff?.role ?? 'waiter');
+                                onDraft((current) => ({...current, staffId: event.target.value, workspace: nextAccess[0] ?? 'front'}));
+                            }}
+                        >
+                            {activeStaff.map((member) => (
+                                <option value={member.id} key={member.id}>{member.name} / {humanStatus(member.role)}</option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="PIN">
+                        <input
+                            type="password"
+                            value={draft.pin}
+                            onChange={(event) => onDraft((current) => ({...current, pin: event.target.value}))}
+                            autoFocus
+                        />
+                    </Field>
+                    <div className="workspace-login-grid">
+                        {workspaces.filter((workspace) => allowedWorkspaces.includes(workspace.key)).map((workspace) => (
+                            <button
+                                type="button"
+                                className={draft.workspace === workspace.key ? 'active' : ''}
+                                key={workspace.key}
+                                onClick={() => onDraft((current) => ({...current, workspace: workspace.key}))}
+                            >
+                                <strong>{workspace.short}</strong>
+                                <span>{workspace.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {error && <div className="error-strip">{error}</div>}
+                    <button type="submit" disabled={busy === 'login' || !selected}>Sign In</button>
+                </form>
             </section>
         </main>
     );
@@ -2259,6 +2498,7 @@ function CounterPage(props: {
     discountValue: number;
     paymentMethod: string;
     paymentTendered: number;
+    menuSearch: string;
     busy: string;
     openOrders: InvoiceSummary[];
     onAddToCart: (item: MenuItem) => void;
@@ -2271,6 +2511,7 @@ function CounterPage(props: {
     onDiscountValue: (value: number) => void;
     onPaymentMethod: (value: string) => void;
     onPaymentTendered: (value: number) => void;
+    onMenuSearch: (value: string) => void;
     onSaveDraft: () => void;
     onQuickClose: () => void;
     onClearCart: () => void;
@@ -2278,10 +2519,21 @@ function CounterPage(props: {
     onSendKOT: (id: string) => void;
     onCloseInvoice: (id: string) => void;
 }) {
-    const saleItems = props.dashboard.menuItems.filter((item) => item.status !== 'hidden');
+    const query = props.menuSearch.trim().toLowerCase();
+    const saleItems = props.dashboard.menuItems.filter((item) => item.status !== 'hidden' && (
+        query === '' ||
+        item.name.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query) ||
+        item.routeName.toLowerCase().includes(query)
+    ));
     return (
         <section className="counter-grid">
             <Panel title="Counter" action={`${saleItems.length} sale items`}>
+                <div className="toolbar-row">
+                    <Field label="Search">
+                        <input value={props.menuSearch} onChange={(event) => props.onMenuSearch(event.target.value)} placeholder="Find item"/>
+                    </Field>
+                </div>
                 <div className="menu-grid">
                     {saleItems.map((item) => (
                         <button
@@ -2328,21 +2580,34 @@ function FloorPage(props: {
     busy: string;
     floorWaiterId: string;
     floorGuestCount: number;
+    menuSearch: string;
+    lineVoidPIN: string;
+    lineVoidReason: string;
     onFloorWaiter: (value: string) => void;
     onFloorGuestCount: (value: number) => void;
+    onMenuSearch: (value: string) => void;
+    onLineVoidPIN: (value: string) => void;
+    onLineVoidReason: (value: string) => void;
     onOpenTable: (tableID: string) => void;
     onOpenSession: (sessionID: string) => void;
     onAddSessionItem: (itemID: string, modifierIDs?: string[]) => void;
     onTransferSession: (tableID: string) => void;
     onSendKOT: () => void;
     onCloseSession: () => void;
+    onVoidLine: (lineID: string) => void;
 }) {
     const selected = props.selectedSession;
     const sessionById = new Map(props.pilot.orderSessions.map((session) => [session.id, session]));
     const occupiedSessions = props.pilot.orderSessions.filter((session) => ['open', 'held'].includes(session.status));
     const occupiedCount = props.pilot.tables.filter((table) => table.status === 'occupied').length;
     const availableTargets = props.pilot.tables.filter((table) => table.status === 'available');
-    const saleItems = props.dashboard.menuItems.filter((item) => item.status !== 'hidden');
+    const query = props.menuSearch.trim().toLowerCase();
+    const saleItems = props.dashboard.menuItems.filter((item) => item.status !== 'hidden' && (
+        query === '' ||
+        item.name.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query) ||
+        item.routeName.toLowerCase().includes(query)
+    ));
     const activeStaff = props.pilot.staff.filter((member) => member.status === 'active');
 
     return (
@@ -2416,9 +2681,32 @@ function FloorPage(props: {
                                         <div className="session-line-side">
                                             <StatusBadge status={line.kotStatus && line.kotStatus !== 'not_sent' ? line.kotStatus : line.status}/>
                                             <em>{currency.format(line.lineTotal)}</em>
+                                            {line.status === 'open' && (
+                                                <button className="ghost-button compact" type="button" onClick={() => props.onVoidLine(line.id)}>
+                                                    Void
+                                                </button>
+                                            )}
                                         </div>
                                     </article>
                                 ))}
+                            </div>
+
+                            <div className="approval-strip">
+                                <Field label="Void PIN">
+                                    <input
+                                        type="password"
+                                        value={props.lineVoidPIN}
+                                        onChange={(event) => props.onLineVoidPIN(event.target.value)}
+                                        placeholder="Manager PIN"
+                                    />
+                                </Field>
+                                <Field label="Reason">
+                                    <input
+                                        value={props.lineVoidReason}
+                                        onChange={(event) => props.onLineVoidReason(event.target.value)}
+                                        placeholder="Guest changed order"
+                                    />
+                                </Field>
                             </div>
 
                             <div className="totals-card">
@@ -2468,6 +2756,11 @@ function FloorPage(props: {
             </div>
 
             <Panel title="Session Menu" action={`${saleItems.length} sale items`}>
+                <div className="toolbar-row">
+                    <Field label="Search">
+                        <input value={props.menuSearch} onChange={(event) => props.onMenuSearch(event.target.value)} placeholder="Find item"/>
+                    </Field>
+                </div>
                 <div className="menu-grid">
                     {saleItems.map((item) => {
                         const modifiers = props.modifiersByItem.get(item.id) ?? [];
@@ -2942,7 +3235,7 @@ function KitchenPage({tickets, printJobs, onUpdateTicket, onQueuePrint}: {
     const [station, setStation] = useState('all');
     const stations = ['all', ...Array.from(new Set(tickets.map((ticket) => ticket.routeName || 'Kitchen')))];
     const visibleTickets = tickets.filter((ticket) => station === 'all' || ticket.routeName === station);
-    const activeTickets = visibleTickets.filter((ticket) => ticket.status !== 'served');
+    const activeTickets = visibleTickets.filter((ticket) => !['served', 'cancelled'].includes(ticket.status));
     const allDayCounts = new Map<string, number>();
     visibleTickets.forEach((ticket) => {
         ticket.lines.forEach((line) => {
@@ -3002,12 +3295,16 @@ function KitchenPage({tickets, printJobs, onUpdateTicket, onQueuePrint}: {
                                 ))}
                             </div>
                             <div className="kds-actions">
-                                {ticket.status !== 'preparing' && ticket.status !== 'ready' && ticket.status !== 'served' && (
+                                {ticket.status !== 'preparing' && ticket.status !== 'ready' && ticket.status !== 'served' && ticket.status !== 'cancelled' && (
                                     <button type="button" onClick={() => onUpdateTicket(ticket.id, 'preparing')}>Start</button>
                                 )}
                                 {ticket.status === 'preparing' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'ready')}>Ready</button>}
                                 {ticket.status === 'ready' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'served')}>Served</button>}
                                 {ticket.status === 'served' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'preparing')}>Recall</button>}
+                                {ticket.status !== 'served' && ticket.status !== 'cancelled' && (
+                                    <button className="ghost-button" type="button" onClick={() => onUpdateTicket(ticket.id, 'cancelled')}>Cancel</button>
+                                )}
+                                {ticket.status === 'cancelled' && <button type="button" onClick={() => onUpdateTicket(ticket.id, 'queued')}>Refire</button>}
                                 <button className="ghost-button" type="button" onClick={() => onQueuePrint('kot', ticket.saleId)}>Print</button>
                             </div>
                         </article>
@@ -3768,11 +4065,13 @@ function IntegrationsPage(props: {
     );
 }
 
-function DayClosePage({summary, cashCounted, busy, onCashCounted, onCloseDay, onExportPDF}: {
+function DayClosePage({summary, cashCounted, closePIN, busy, onCashCounted, onClosePIN, onCloseDay, onExportPDF}: {
     summary: DayCloseSummary;
     cashCounted: number;
+    closePIN: string;
     busy: string;
     onCashCounted: (value: number) => void;
+    onClosePIN: (value: string) => void;
     onCloseDay: () => void;
     onExportPDF: () => void;
 }) {
@@ -3792,9 +4091,14 @@ function DayClosePage({summary, cashCounted, busy, onCashCounted, onCloseDay, on
                     <Field label="Variance">
                         <input readOnly value={currency.format(cashCounted - summary.cashExpected)}/>
                     </Field>
+                    <Field label="Close PIN">
+                        <input type="password" value={closePIN} onChange={(event) => onClosePIN(event.target.value)} placeholder="Manager PIN"/>
+                    </Field>
                 </div>
                 <div className="button-row">
-                    <button type="button" disabled={busy === 'close-day'} onClick={onCloseDay}>Close Day</button>
+                    <button type="button" disabled={busy === 'close-day' || summary.status === 'closed'} onClick={onCloseDay}>
+                        {summary.status === 'closed' ? 'Closed' : 'Close Day'}
+                    </button>
                     <button type="button" className="ghost-button" disabled={busy === 'dayclose-pdf'} onClick={onExportPDF}>Save PDF</button>
                 </div>
             </Panel>
@@ -3991,6 +4295,7 @@ function SettingsPage({
     metrics,
     notifications,
     pilot,
+    syncStatus,
     settingsDraft,
     staffDraft,
     busy,
@@ -4000,10 +4305,12 @@ function SettingsPage({
     onStaffDraft,
     onSaveStaff,
     onUpdateStaffStatus,
+    onExportBackup,
 }: {
     metrics: Metrics;
     notifications: NotificationRecord[];
     pilot: PilotWorkspace;
+    syncStatus: SyncStatus | null;
     settingsDraft: RestaurantSettings | null;
     staffDraft: StaffDraft;
     busy: string;
@@ -4013,6 +4320,7 @@ function SettingsPage({
     onStaffDraft: (value: StaffDraft | ((current: StaffDraft) => StaffDraft)) => void;
     onSaveStaff: () => void;
     onUpdateStaffStatus: (member: StaffMember, status: string) => void;
+    onExportBackup: () => void;
 }) {
     const activeStaff = pilot.staff.filter((member) => member.status === 'active');
     return (
@@ -4039,6 +4347,9 @@ function SettingsPage({
                             <Field label="Service">
                                 <input type="number" step="0.01" min="0" value={settingsDraft.serviceChargeRate} onChange={(event) => onSettingsDraft({...settingsDraft, serviceChargeRate: Number(event.target.value)})}/>
                             </Field>
+                            <Field label="Backup path">
+                                <input value={settingsDraft.backupPath} onChange={(event) => onSettingsDraft({...settingsDraft, backupPath: event.target.value})}/>
+                            </Field>
                         </div>
                         <button type="button" disabled={busy === 'save-settings'} onClick={onSaveSettings}>Save Setup</button>
                     </div>
@@ -4046,8 +4357,7 @@ function SettingsPage({
             </Panel>
             <Panel title="Manager" action="Local PIN">
                 <div className="settings-stack">
-                    <DataRow label="Development PIN" value="1234"/>
-                    <DataRow label="Protected actions" value="Void, refund, day close"/>
+                    <DataRow label="Protected actions" value="Void, refund, line void, day close"/>
                     <DataRow label="Staff" value={String(pilot.staff.length)}/>
                     <DataRow label="Audit records" value={String(pilot.auditLog.length)}/>
                 </div>
@@ -4083,7 +4393,7 @@ function SettingsPage({
                             <option value="owner">Owner</option>
                         </select>
                         <input
-                            placeholder="PIN optional"
+                            placeholder="PIN"
                             type="password"
                             value={staffDraft.pin}
                             onChange={(event) => onStaffDraft((current) => ({...current, pin: event.target.value}))}
@@ -4116,10 +4426,15 @@ function SettingsPage({
             </Panel>
             <Panel title="Local Health" action="Offline first">
                 <div className="settings-stack">
-                    <DataRow label="Sync queue" value={String(metrics.pendingSyncItems)}/>
+                    <DataRow label="Sync queue" value={String(syncStatus?.pendingCount ?? metrics.pendingSyncItems)}/>
+                    <DataRow label="Sync failures" value={String(syncStatus?.failedCount ?? 0)}/>
+                    <DataRow label="Database" value={formatBytes(syncStatus?.databaseBytes ?? 0)}/>
                     <DataRow label="Open KOTs" value={String(metrics.openKots)}/>
                     <DataRow label="Message queue" value={String(notifications.length)}/>
                     <DataRow label="Tables" value={String(pilot.tables.length)}/>
+                </div>
+                <div className="button-row">
+                    <button type="button" disabled={busy === 'backup'} onClick={onExportBackup}>Backup Now</button>
                 </div>
             </Panel>
             <Panel title="Security Audit" action={`${pilot.auditLog.length} recent`}>
@@ -4435,6 +4750,29 @@ function normalizeAdminAnalytics(input: AdminAnalytics): AdminAnalytics {
     };
 }
 
+function normalizeStaffSession(input: StaffSession): StaffSession {
+    return {
+        ...input,
+        permissions: input.permissions ?? [],
+        workspaceAccess: (input.workspaceAccess ?? []).filter((workspace): workspace is WorkspaceKey => workspaces.some((item) => item.key === workspace)),
+    };
+}
+
+function normalizeSyncStatus(input: SyncStatus): SyncStatus {
+    return {
+        pendingCount: input?.pendingCount ?? 0,
+        syncedCount: input?.syncedCount ?? 0,
+        failedCount: input?.failedCount ?? 0,
+        oldestPendingAt: input?.oldestPendingAt ?? '',
+        lastSyncedAt: input?.lastSyncedAt ?? '',
+        lastError: input?.lastError ?? '',
+        databasePath: input?.databasePath ?? '',
+        databaseBytes: input?.databaseBytes ?? 0,
+        walBytes: input?.walBytes ?? 0,
+        updatedAt: input?.updatedAt ?? '',
+    };
+}
+
 function normalizeInvoiceDetail(input: InvoiceDetail): InvoiceDetail {
     return {
         ...input,
@@ -4542,6 +4880,27 @@ function humanStatus(status: string) {
     return status.replace(/_/g, ' ');
 }
 
+function workspaceAccessForRole(role: string): WorkspaceKey[] {
+    switch (role) {
+        case 'owner':
+        case 'manager':
+            return ['front', 'kitchenOps', 'backoffice', 'admin'];
+        case 'kitchen':
+        case 'barista':
+            return ['kitchenOps'];
+        case 'cashier':
+        case 'waiter':
+        case 'runner':
+            return ['front'];
+        default:
+            return ['front'];
+    }
+}
+
+function workspaceLabel(workspaceKey: WorkspaceKey) {
+    return workspaces.find((workspace) => workspace.key === workspaceKey)?.label ?? workspaceKey;
+}
+
 function pageLabel(pageKey: PageKey) {
     return pages.find((page) => page.key === pageKey)?.label ?? 'Command Center';
 }
@@ -4551,6 +4910,13 @@ function formatAnalyticsValue(value: number, format: string) {
     if (format === 'percent') return `${Math.round(value || 0)}%`;
     if (format === 'minutes') return `${Math.round(value || 0)}m`;
     return compactNumber.format(value || 0);
+}
+
+function formatBytes(value: number) {
+    if (!value) return '0 B';
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function ticketAgeMinutes(createdAt: string) {

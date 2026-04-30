@@ -437,6 +437,18 @@ export namespace nexus {
 	        this.createdAt = source["createdAt"];
 	    }
 	}
+	export class BackupInput {
+	    destination: string;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.destination = source["destination"];
+	    }
+	}
 	export class CloseInvoiceInput {
 	    invoiceId: string;
 	    paymentMethod: string;
@@ -977,6 +989,8 @@ export namespace nexus {
 	    businessDate: string;
 	    cashCounted: number;
 	    notes: string;
+	    staffId: string;
+	    pin: string;
 
 	    static createFrom(source: any = {}) {
 	        return new DayCloseInput(source);
@@ -987,6 +1001,8 @@ export namespace nexus {
 	        this.businessDate = source["businessDate"];
 	        this.cashCounted = source["cashCounted"];
 	        this.notes = source["notes"];
+	        this.staffId = source["staffId"];
+	        this.pin = source["pin"];
 	    }
 	}
 	export class DayCloseSummary {
@@ -2393,6 +2409,26 @@ export namespace nexus {
 	}
 
 
+	export class SessionLineVoidInput {
+	    sessionId: string;
+	    lineId: string;
+	    staffId: string;
+	    pin: string;
+	    reason: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SessionLineVoidInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.lineId = source["lineId"];
+	        this.staffId = source["staffId"];
+	        this.pin = source["pin"];
+	        this.reason = source["reason"];
+	    }
+	}
 
 
 	export class SplitLineInput {
@@ -2446,6 +2482,24 @@ export namespace nexus {
 		}
 	}
 
+	export class StaffActionApprovalInput {
+	    staffId: string;
+	    pin: string;
+	    action: string;
+	    targetId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new StaffActionApprovalInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.staffId = source["staffId"];
+	        this.pin = source["pin"];
+	        this.action = source["action"];
+	        this.targetId = source["targetId"];
+	    }
+	}
 	export class StaffInput {
 	    id: string;
 	    name: string;
@@ -2466,7 +2520,77 @@ export namespace nexus {
 	        this.status = source["status"];
 	    }
 	}
+	export class StaffLoginInput {
+	    staffId: string;
+	    pin: string;
+	    workspace: string;
 
+	    static createFrom(source: any = {}) {
+	        return new StaffLoginInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.staffId = source["staffId"];
+	        this.pin = source["pin"];
+	        this.workspace = source["workspace"];
+	    }
+	}
+
+	export class StaffSession {
+	    staffId: string;
+	    name: string;
+	    role: string;
+	    permissions: string[];
+	    workspaceAccess: string[];
+	    issuedAt: string;
+	    expiresAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new StaffSession(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.staffId = source["staffId"];
+	        this.name = source["name"];
+	        this.role = source["role"];
+	        this.permissions = source["permissions"];
+	        this.workspaceAccess = source["workspaceAccess"];
+	        this.issuedAt = source["issuedAt"];
+	        this.expiresAt = source["expiresAt"];
+	    }
+	}
+	export class SyncStatus {
+	    pendingCount: number;
+	    syncedCount: number;
+	    failedCount: number;
+	    oldestPendingAt: string;
+	    lastSyncedAt: string;
+	    lastError: string;
+	    databasePath: string;
+	    databaseBytes: number;
+	    walBytes: number;
+	    updatedAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SyncStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pendingCount = source["pendingCount"];
+	        this.syncedCount = source["syncedCount"];
+	        this.failedCount = source["failedCount"];
+	        this.oldestPendingAt = source["oldestPendingAt"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.lastError = source["lastError"];
+	        this.databasePath = source["databasePath"];
+	        this.databaseBytes = source["databaseBytes"];
+	        this.walBytes = source["walBytes"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class TableMoveInput {
 	    sessionId: string;
 	    targetTableId: string;
