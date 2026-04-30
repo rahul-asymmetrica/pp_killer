@@ -607,8 +607,18 @@ func TestStaffDirectoryAndTableAssignmentHardening(t *testing.T) {
 	if session.Session.WaiterName != "Maya Floor Lead" || session.Session.GuestCount != 3 {
 		t.Fatalf("expected table assignment to saved staff, got %#v", session.Session)
 	}
+	reassigned, err := store.AssignOrderSessionStaff(AssignOrderSessionStaffInput{SessionID: session.Session.ID, StaffID: "staff_waiter"})
+	if err != nil {
+		t.Fatalf("reassign table staff: %v", err)
+	}
+	if reassigned.Session.WaiterName != "Ravi Waiter" || reassigned.Session.WaiterID != "staff_waiter" {
+		t.Fatalf("expected reassigned table staff, got %#v", reassigned.Session)
+	}
 	if _, err := store.SaveStaff(StaffInput{ID: maya.ID, Name: maya.Name, Role: maya.Role, Status: "inactive"}); err != nil {
 		t.Fatalf("archive staff: %v", err)
+	}
+	if _, err := store.AssignOrderSessionStaff(AssignOrderSessionStaffInput{SessionID: session.Session.ID, StaffID: maya.ID}); err == nil {
+		t.Fatalf("expected inactive staff reassignment to fail")
 	}
 	if _, err := store.OpenOrderSession(OpenOrderSessionInput{TableID: "tbl_02", WaiterID: maya.ID, GuestCount: 2}); err == nil {
 		t.Fatalf("expected inactive staff assignment to fail")
@@ -1192,6 +1202,17 @@ func TestSeedDemoOperationsCreatesDemoDataset(t *testing.T) {
 	}
 	if result.Customers < 150 || result.PurchaseOrders == 0 || result.SalesTotal <= 0 {
 		t.Fatalf("expected customers, purchases and sales, got %#v", result)
+	}
+	tx, err := store.db.Begin()
+	if err != nil {
+		t.Fatalf("begin restart reference tx: %v", err)
+	}
+	if err := store.ensurePilotReferenceData(tx); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("restart reference data: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit restart reference tx: %v", err)
 	}
 
 	workspace, err := store.GetPilotWorkspace()

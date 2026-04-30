@@ -4,6 +4,8 @@ import {nexus} from '../models';
 
 export function AddOrderSessionLine(arg1:nexus.AddOrderSessionLineInput):Promise<nexus.OrderSessionDetail>;
 
+export function AssignOrderSessionStaff(arg1:nexus.AssignOrderSessionStaffInput):Promise<nexus.OrderSessionDetail>;
+
 export function AuthenticateStaff(arg1:nexus.StaffLoginInput):Promise<nexus.StaffSession>;
 
 export function AuthorizeStaffAction(arg1:nexus.StaffActionApprovalInput):Promise<nexus.ApprovalToken>;

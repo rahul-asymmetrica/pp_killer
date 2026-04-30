@@ -613,6 +613,11 @@ type OpenOrderSessionInput struct {
 	ServiceMode string `json:"serviceMode"`
 }
 
+type AssignOrderSessionStaffInput struct {
+	SessionID string `json:"sessionId"`
+	StaffID   string `json:"staffId"`
+}
+
 type AddOrderSessionLineInput struct {
 	SessionID   string   `json:"sessionId"`
 	ItemID      string   `json:"itemId"`

@@ -251,7 +251,7 @@ func seedDemoStaffTx(tx *sql.Tx, now string) error {
 		"Kiara Floor", "Sara Floor", "Tara Floor", "Meera Floor", "Rhea Floor",
 	}
 	for index, name := range names {
-		id := fmt.Sprintf("staff_waiter_%02d", index+1)
+		id := demoWaiterID(index)
 		if _, err := tx.Exec(`
 			INSERT INTO staff (id, name, role, pin_hash, status, created_at)
 			VALUES (?, ?, 'waiter', ?, 'active', ?)
@@ -292,6 +292,9 @@ func seedDemoFloorTx(tx *sql.Tx) error {
 				seats = 4
 			}
 			id := fmt.Sprintf("tbl_%02d", tableNumber)
+			if section.prefix == "P" && index == 1 {
+				id = "tbl_p1"
+			}
 			name := fmt.Sprintf("%s-%02d", section.prefix, index)
 			if _, err := tx.Exec(`
 				INSERT INTO dining_tables (id, section_id, name, seats, status, active_session_id)
@@ -759,7 +762,7 @@ func seedDemoLiveSessionsTx(tx *sql.Tx, today time.Time, menu []demoMenuItem, rn
 	for index := 0; index < 12; index++ {
 		sessionID := fmt.Sprintf("demo_live_session_%02d", index+1)
 		tableID := fmt.Sprintf("tbl_%02d", index+1)
-		waiterID := fmt.Sprintf("staff_waiter_%02d", (index%20)+1)
+		waiterID := demoWaiterID(index % 20)
 		opened := today.Add(time.Duration(11+index%9)*time.Hour + time.Duration(5+index*3)*time.Minute)
 		lines := demoOrderLines(menu, 12+index%9, rng)
 		subtotal := 0.0
@@ -1005,6 +1008,13 @@ func demoCustomerProfiles(count int) []demoCustomerProfile {
 		})
 	}
 	return profiles
+}
+
+func demoWaiterID(index int) string {
+	if index <= 0 {
+		return "staff_waiter"
+	}
+	return fmt.Sprintf("staff_waiter_%02d", index+1)
 }
 
 func demoOrderCount(date time.Time, dayIndex int, rng *rand.Rand) int {

@@ -1,7 +1,8 @@
-import {useEffect, useMemo, useState, type CSSProperties, type ReactNode} from 'react';
+import {useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode} from 'react';
 import './App.css';
 import {
     AddOrderSessionLine,
+    AssignOrderSessionStaff,
     AuthenticateStaff,
     CancelPaymentRequest,
     CloseInvoice,
@@ -1148,9 +1149,7 @@ function App() {
             setSettingsDraft(normalizedPilot.settings);
             const printer = normalizedPilot.integrations.find((integration) => integration.provider === 'escpos_printer');
             if (printer?.baseUrl) setPrinterTarget(printer.baseUrl);
-            if (!selectedSession && normalizedPilot.orderSessions.length > 0) {
-                await openSession(normalizedPilot.orderSessions[0].id, false);
-            } else if (selectedSession?.session.id && normalizedPilot.orderSessions.some((session) => session.id === selectedSession.session.id)) {
+            if (selectedSession?.session.id && normalizedPilot.orderSessions.some((session) => session.id === selectedSession.session.id)) {
                 await openSession(selectedSession.session.id, false);
             } else if (selectedSession?.session.id) {
                 setSelectedSession(null);
@@ -1358,20 +1357,34 @@ function App() {
         }
     }
 
-    function openTable(tableID: string) {
-        if (!floorWaiterId) {
+    function openTable(tableID: string, staffID = floorWaiterId) {
+        if (!staffID) {
             pushToast('error', 'Choose staff first', 'Select the person handling this table');
             return;
         }
         return runAction(`open-table-${tableID}`, 'Table opened', async () => {
             const detail = await OpenOrderSession(new nexus.OpenOrderSessionInput({
                 tableId: tableID,
-                waiterId: floorWaiterId,
+                waiterId: staffID,
                 guestCount: Math.max(1, Math.round(floorGuestCount) || 1),
                 serviceMode: 'dine_in',
             }));
             setSelectedSession(normalizeOrderSessionDetail(detail as OrderSessionDetail));
             setActivePage('floor');
+        });
+    }
+
+    function assignSessionStaff(sessionID: string, staffID: string) {
+        if (!staffID) {
+            pushToast('error', 'Choose staff first', 'Select the person handling this table');
+            return;
+        }
+        return runAction(`assign-table-${sessionID}-${staffID}`, 'Staff assigned', async () => {
+            const detail = await AssignOrderSessionStaff(new nexus.AssignOrderSessionStaffInput({
+                sessionId: sessionID,
+                staffId: staffID,
+            }));
+            setSelectedSession(normalizeOrderSessionDetail(detail as OrderSessionDetail));
         });
     }
 
@@ -2101,6 +2114,7 @@ function App() {
                         onLineVoidReason={setLineVoidReason}
                         onOpenTable={openTable}
                         onOpenSession={openSession}
+                        onAssignSessionStaff={assignSessionStaff}
                         onAddSessionItem={addSessionItem}
                         onTransferSession={transferSession}
                         onSendKOT={sendSessionKOT}
@@ -2588,8 +2602,9 @@ function FloorPage(props: {
     onMenuSearch: (value: string) => void;
     onLineVoidPIN: (value: string) => void;
     onLineVoidReason: (value: string) => void;
-    onOpenTable: (tableID: string) => void;
+    onOpenTable: (tableID: string, staffID?: string) => void;
     onOpenSession: (sessionID: string) => void;
+    onAssignSessionStaff: (sessionID: string, staffID: string) => void;
     onAddSessionItem: (itemID: string, modifierIDs?: string[]) => void;
     onTransferSession: (tableID: string) => void;
     onSendKOT: () => void;
@@ -2597,10 +2612,16 @@ function FloorPage(props: {
     onVoidLine: (lineID: string) => void;
 }) {
     const selected = props.selectedSession;
+    const [focusedTableId, setFocusedTableId] = useState('');
+    const [sectionFilter, setSectionFilter] = useState('all');
+    const [dragStaffId, setDragStaffId] = useState('');
     const sessionById = new Map(props.pilot.orderSessions.map((session) => [session.id, session]));
     const occupiedSessions = props.pilot.orderSessions.filter((session) => ['open', 'held'].includes(session.status));
     const occupiedCount = props.pilot.tables.filter((table) => table.status === 'occupied').length;
-    const availableTargets = props.pilot.tables.filter((table) => table.status === 'available');
+    const focusedTable = props.pilot.tables.find((table) => table.id === focusedTableId) ?? null;
+    const modalSession = focusedTable?.activeSessionId && selected?.session.id === focusedTable.activeSessionId ? selected : null;
+    const modalSummary = focusedTable?.activeSessionId ? sessionById.get(focusedTable.activeSessionId) : undefined;
+    const availableTargets = props.pilot.tables.filter((table) => table.status === 'available' && table.id !== focusedTable?.id);
     const query = props.menuSearch.trim().toLowerCase();
     const saleItems = props.dashboard.menuItems.filter((item) => item.status !== 'hidden' && (
         query === '' ||
@@ -2609,182 +2630,350 @@ function FloorPage(props: {
         item.routeName.toLowerCase().includes(query)
     ));
     const activeStaff = props.pilot.staff.filter((member) => member.status === 'active');
+    const staffDirectory = activeStaff.filter((member) => ['owner', 'manager', 'cashier', 'waiter', 'runner'].includes(member.role));
+    const assignableStaff = staffDirectory.length > 0 ? staffDirectory : activeStaff;
+    const selectedStaff = assignableStaff.find((member) => member.id === props.floorWaiterId) ?? assignableStaff[0];
+    const floorSections = props.pilot.floorSections.length > 0
+        ? props.pilot.floorSections
+        : Array.from(new Map(props.pilot.tables.map((table) => [table.sectionId, {id: table.sectionId, name: table.sectionName, sortOrder: 0}])).values());
+    const visibleTables = sectionFilter === 'all'
+        ? props.pilot.tables
+        : props.pilot.tables.filter((table) => table.sectionId === sectionFilter);
+
+    useEffect(() => {
+        if (focusedTableId && !props.pilot.tables.some((table) => table.id === focusedTableId)) {
+            setFocusedTableId('');
+        }
+    }, [focusedTableId, props.pilot.tables]);
+
+    function focusTable(table: DiningTable) {
+        setFocusedTableId(table.id);
+        if (table.activeSessionId) {
+            props.onOpenSession(table.activeSessionId);
+        }
+    }
+
+    function assignStaffToTable(table: DiningTable, staffID: string) {
+        if (!staffID) return;
+        props.onFloorWaiter(staffID);
+        setFocusedTableId(table.id);
+        if (table.activeSessionId) {
+            props.onAssignSessionStaff(table.activeSessionId, staffID);
+        } else {
+            props.onOpenTable(table.id, staffID);
+        }
+    }
+
+    function handleTableDrop(event: DragEvent<HTMLButtonElement>, table: DiningTable) {
+        event.preventDefault();
+        const staffID = event.dataTransfer.getData('text/staff-id') || dragStaffId;
+        setDragStaffId('');
+        assignStaffToTable(table, staffID);
+    }
+
+    function pickStaff(staffID: string) {
+        props.onFloorWaiter(staffID);
+        if (focusedTable?.activeSessionId) {
+            props.onAssignSessionStaff(focusedTable.activeSessionId, staffID);
+        }
+    }
 
     return (
-        <section className="floor-grid">
+        <section className="floor-grid floor-grid-touch">
             <Panel title="Floor" action={`${occupiedCount}/${props.pilot.tables.length} occupied`}>
-                <div className="table-assignment-bar">
-                    <Field label="Server">
-                        <select value={props.floorWaiterId} onChange={(event) => props.onFloorWaiter(event.target.value)}>
-                            {activeStaff.length === 0 && <option value="">Add staff in Settings</option>}
-                            {activeStaff.map((member) => (
-                                <option value={member.id} key={member.id}>
-                                    {member.name} / {humanStatus(member.role)}
-                                </option>
-                            ))}
-                        </select>
-                    </Field>
-                    <Field label="Guests">
-                        <input
-                            type="number"
-                            min="1"
-                            value={props.floorGuestCount}
-                            onChange={(event) => props.onFloorGuestCount(Math.max(1, Number(event.target.value) || 1))}
-                        />
-                    </Field>
-                </div>
-                <div className="table-strip">
-                    {props.pilot.tables.map((table) => {
-                        const session = table.activeSessionId ? sessionById.get(table.activeSessionId) : undefined;
-                        const active = Boolean(selected?.session.id && selected.session.id === table.activeSessionId);
-                        return (
-                            <button
-                                type="button"
-                                className={`table-chip ${table.status} ${active ? 'active' : ''}`}
-                                key={table.id}
-                                onClick={() => table.activeSessionId ? props.onOpenSession(table.activeSessionId) : props.onOpenTable(table.id)}
-                            >
-                                <span>{table.sectionName}</span>
-                                <strong>{table.name}</strong>
-                                <StatusBadge status={session ? sessionKitchenStatus(session) : table.status}/>
-                                <em>{session ? currency.format(session.total) : `${table.seats} seats`}</em>
+                <div className="floor-console">
+                    <div className="floor-console-head">
+                        <div className="section-rail" aria-label="Floor sections">
+                            <button type="button" className={sectionFilter === 'all' ? 'active' : ''} onClick={() => setSectionFilter('all')}>
+                                All
                             </button>
-                        );
-                    })}
-                </div>
-            </Panel>
+                            {floorSections.map((section) => (
+                                <button
+                                    type="button"
+                                    className={sectionFilter === section.id ? 'active' : ''}
+                                    key={section.id}
+                                    onClick={() => setSectionFilter(section.id)}
+                                >
+                                    {section.name}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="table-assignment-bar">
+                            <Field label="Server">
+                                <select value={props.floorWaiterId} onChange={(event) => props.onFloorWaiter(event.target.value)}>
+                                    {assignableStaff.length === 0 && <option value="">Add staff in Settings</option>}
+                                    {assignableStaff.map((member) => (
+                                        <option value={member.id} key={member.id}>
+                                            {member.name} / {humanStatus(member.role)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Field>
+                            <Field label="Guests">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={props.floorGuestCount}
+                                    onChange={(event) => props.onFloorGuestCount(Math.max(1, Number(event.target.value) || 1))}
+                                />
+                            </Field>
+                        </div>
+                    </div>
 
-            <div className="floor-workspace">
-                <Panel title={selected?.session.tableName || 'Table Session'} action={selected ? currency.format(selected.session.total) : 'Open'}>
-                    {!selected && <p className="empty-copy">Select a table</p>}
-                    {selected && (
-                        <div className="session-board">
-                            <div className="detail-head">
-                                <div>
-                                    <span>Waiter</span>
-                                    <strong>{selected.session.waiterName || 'Floor'}</strong>
-                                </div>
-                                <div>
-                                    <span>Guests</span>
-                                    <strong>{selected.session.guestCount}</strong>
-                                </div>
+                    <div className="floor-touch-layout">
+                        <div className="table-directory" aria-label="Tables directory">
+                            {visibleTables.map((table) => {
+                                const session = table.activeSessionId ? sessionById.get(table.activeSessionId) : undefined;
+                                const active = Boolean(focusedTable?.id === table.id);
+                                return (
+                                    <button
+                                        type="button"
+                                        className={`table-chip ${table.status} ${active ? 'active' : ''} ${dragStaffId ? 'drop-ready' : ''}`}
+                                        key={table.id}
+                                        onClick={() => focusTable(table)}
+                                        onDragOver={(event) => event.preventDefault()}
+                                        onDrop={(event) => handleTableDrop(event, table)}
+                                    >
+                                        <span>{table.sectionName}</span>
+                                        <strong>{table.name}</strong>
+                                        <StatusBadge status={session ? sessionKitchenStatus(session) : table.status}/>
+                                        <em>{session ? `${session.waiterName || 'Floor'} / ${currency.format(session.total)}` : `${table.seats} seats`}</em>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <aside className="staff-dock">
+                            <div className="staff-dock-head">
+                                <strong>Staff</strong>
+                                <span>{assignableStaff.length}</span>
                             </div>
-
-                            <div className="line-stack">
-                                {selected.lines.length === 0 && <p className="empty-copy">No items</p>}
-                                {selected.lines.map((line) => (
-                                    <article className="session-line" key={line.id}>
-                                        <div>
-                                            <strong>{line.quantity} x {line.itemName}</strong>
-                                            <span>{line.modifierNames.join(', ') || 'Base item'}</span>
-                                        </div>
-                                        <div className="session-line-side">
-                                            <StatusBadge status={line.kotStatus && line.kotStatus !== 'not_sent' ? line.kotStatus : line.status}/>
-                                            <em>{currency.format(line.lineTotal)}</em>
-                                            {line.status === 'open' && (
-                                                <button className="ghost-button compact" type="button" onClick={() => props.onVoidLine(line.id)}>
-                                                    Void
-                                                </button>
-                                            )}
-                                        </div>
-                                    </article>
-                                ))}
-                            </div>
-
-                            <div className="approval-strip">
-                                <Field label="Void PIN">
-                                    <input
-                                        type="password"
-                                        value={props.lineVoidPIN}
-                                        onChange={(event) => props.onLineVoidPIN(event.target.value)}
-                                        placeholder="Manager PIN"
-                                    />
-                                </Field>
-                                <Field label="Reason">
-                                    <input
-                                        value={props.lineVoidReason}
-                                        onChange={(event) => props.onLineVoidReason(event.target.value)}
-                                        placeholder="Guest changed order"
-                                    />
-                                </Field>
-                            </div>
-
-                            <div className="totals-card">
-                                <MoneyRow label="Subtotal" value={selected.session.subtotal}/>
-                                <MoneyRow label="Service" value={selected.session.serviceCharge}/>
-                                <MoneyRow label="GST" value={selected.session.taxTotal}/>
-                                <MoneyRow label="Total" value={selected.session.total} strong/>
-                            </div>
-
-                            <div className="button-row">
-                                <button type="button" disabled={props.busy === 'session-kot'} onClick={props.onSendKOT}>Send KOT</button>
-                                <button type="button" disabled={props.busy === 'session-close'} onClick={props.onCloseSession}>Close Table</button>
-                            </div>
-
-                            <div className="transfer-row">
-                                {availableTargets.slice(0, 4).map((table) => (
-                                    <button className="ghost-button" type="button" key={table.id} onClick={() => props.onTransferSession(table.id)}>
-                                        Move {table.name}
+                            <div className="staff-chip-list">
+                                {assignableStaff.map((member) => (
+                                    <button
+                                        type="button"
+                                        className={`staff-chip ${props.floorWaiterId === member.id ? 'active' : ''}`}
+                                        key={member.id}
+                                        draggable
+                                        onClick={() => props.onFloorWaiter(member.id)}
+                                        onDragStart={(event) => {
+                                            event.dataTransfer.setData('text/staff-id', member.id);
+                                            event.dataTransfer.effectAllowed = 'copyMove';
+                                            setDragStaffId(member.id);
+                                        }}
+                                        onDragEnd={() => setDragStaffId('')}
+                                    >
+                                        <strong>{member.name}</strong>
+                                        <span>{humanStatus(member.role)}</span>
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
-                </Panel>
-
-                <Panel title="Live Tables" action={`${occupiedSessions.length} active`}>
-                    <div className="live-table-grid">
-                        {occupiedSessions.length === 0 && <p className="empty-copy">No live tables</p>}
-                        {occupiedSessions.map((session) => (
-                            <button
-                                className={`live-table-card ${selected?.session.id === session.id ? 'active' : ''}`}
-                                type="button"
-                                key={session.id}
-                                onClick={() => props.onOpenSession(session.id)}
-                            >
-                                <div>
-                                    <strong>{session.tableName}</strong>
-                                    <span>{session.waiterName || 'Floor'} / {session.guestCount} guests</span>
-                                </div>
-                                <StatusBadge status={sessionKitchenStatus(session)}/>
-                                <p>{sessionKitchenLabel(session)}</p>
-                                <em>{currency.format(session.total)}</em>
-                            </button>
-                        ))}
+                        </aside>
                     </div>
-                </Panel>
-            </div>
-
-            <Panel title="Session Menu" action={`${saleItems.length} sale items`}>
-                <div className="toolbar-row">
-                    <Field label="Search">
-                        <input value={props.menuSearch} onChange={(event) => props.onMenuSearch(event.target.value)} placeholder="Find item"/>
-                    </Field>
-                </div>
-                <div className="menu-grid">
-                    {saleItems.map((item) => {
-                        const modifiers = props.modifiersByItem.get(item.id) ?? [];
-                        return (
-                            <article className={`session-menu-tile ${item.status}`} key={item.id}>
-                                <button type="button" disabled={item.status !== 'active'} onClick={() => props.onAddSessionItem(item.id)}>
-                                    <span>{item.routeName}</span>
-                                    <strong>{item.name}</strong>
-                                    <em>{item.status === 'active' ? currency.format(item.price) : humanStatus(item.status)}</em>
-                                </button>
-                                {item.status === 'active' && modifiers.length > 0 && (
-                                    <div className="modifier-row">
-                                        {modifiers.slice(0, 2).map((modifier) => (
-                                            <button className="ghost-button" type="button" key={modifier.id} onClick={() => props.onAddSessionItem(item.id, [modifier.id])}>
-                                                {modifier.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </article>
-                        );
-                    })}
                 </div>
             </Panel>
+
+            {focusedTable && (
+                <div className="table-modal-backdrop" role="dialog" aria-modal="true" aria-label={`${focusedTable.name} table`} onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) setFocusedTableId('');
+                }}>
+                    <div
+                        className={`table-modal ${focusedTable.status}`}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                            const staffID = event.dataTransfer.getData('text/staff-id') || dragStaffId;
+                            setDragStaffId('');
+                            assignStaffToTable(focusedTable, staffID);
+                        }}
+                    >
+                        <div className="table-modal-head">
+                            <div>
+                                <span>{focusedTable.sectionName}</span>
+                                <h2>{focusedTable.name}</h2>
+                            </div>
+                            <div className="table-modal-actions">
+                                <StatusBadge status={modalSummary ? sessionKitchenStatus(modalSummary) : focusedTable.status}/>
+                                <button className="ghost-button" type="button" onClick={() => setFocusedTableId('')}>Close</button>
+                            </div>
+                        </div>
+
+                        <div className="table-modal-grid">
+                            <div className="table-modal-main">
+                                <div className="detail-head table-detail-head">
+                                    <div>
+                                        <span>Server</span>
+                                        <strong>{modalSession?.session.waiterName || modalSummary?.waiterName || selectedStaff?.name || 'Unassigned'}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Guests</span>
+                                        <strong>{modalSession?.session.guestCount ?? modalSummary?.guestCount ?? props.floorGuestCount}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Seats</span>
+                                        <strong>{focusedTable.seats}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Total</span>
+                                        <strong>{modalSession || modalSummary ? currency.format((modalSession?.session ?? modalSummary)?.total ?? 0) : '-'}</strong>
+                                    </div>
+                                </div>
+
+                                {!focusedTable.activeSessionId && (
+                                    <div className="empty-table-card">
+                                        <DataRow label="Server" value={selectedStaff?.name ?? 'Unassigned'}/>
+                                        <DataRow label="Guests" value={String(props.floorGuestCount)}/>
+                                        <button type="button" disabled={!selectedStaff || props.busy === `open-table-${focusedTable.id}`} onClick={() => props.onOpenTable(focusedTable.id)}>
+                                            Open Table
+                                        </button>
+                                    </div>
+                                )}
+
+                                {focusedTable.activeSessionId && !modalSession && (
+                                    <p className="empty-copy">Loading table</p>
+                                )}
+
+                                {modalSession && (
+                                    <>
+                                        <div className="line-stack table-modal-lines">
+                                            {modalSession.lines.length === 0 && <p className="empty-copy">No items</p>}
+                                            {modalSession.lines.map((line) => (
+                                                <article className="session-line" key={line.id}>
+                                                    <div>
+                                                        <strong>{line.quantity} x {line.itemName}</strong>
+                                                        <span>{line.modifierNames.join(', ') || 'Base item'}</span>
+                                                    </div>
+                                                    <div className="session-line-side">
+                                                        <StatusBadge status={line.kotStatus && line.kotStatus !== 'not_sent' ? line.kotStatus : line.status}/>
+                                                        <em>{currency.format(line.lineTotal)}</em>
+                                                        {line.status === 'open' && (
+                                                            <button className="ghost-button compact" type="button" onClick={() => props.onVoidLine(line.id)}>
+                                                                Void
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </article>
+                                            ))}
+                                        </div>
+
+                                        <div className="modal-menu-panel">
+                                            <div className="toolbar-row">
+                                                <Field label="Search">
+                                                    <input value={props.menuSearch} onChange={(event) => props.onMenuSearch(event.target.value)} placeholder="Find item"/>
+                                                </Field>
+                                            </div>
+                                            <div className="modal-menu-grid">
+                                                {saleItems.map((item) => {
+                                                    const modifiers = props.modifiersByItem.get(item.id) ?? [];
+                                                    return (
+                                                        <article className={`session-menu-tile ${item.status}`} key={item.id}>
+                                                            <button type="button" disabled={item.status !== 'active'} onClick={() => props.onAddSessionItem(item.id)}>
+                                                                <span>{item.routeName}</span>
+                                                                <strong>{item.name}</strong>
+                                                                <em>{item.status === 'active' ? currency.format(item.price) : humanStatus(item.status)}</em>
+                                                            </button>
+                                                            {item.status === 'active' && modifiers.length > 0 && (
+                                                                <div className="modifier-row">
+                                                                    {modifiers.slice(0, 2).map((modifier) => (
+                                                                        <button className="ghost-button" type="button" key={modifier.id} onClick={() => props.onAddSessionItem(item.id, [modifier.id])}>
+                                                                            {modifier.name}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </article>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <aside className="table-modal-side">
+                                <section className="modal-side-section">
+                                    <div className="staff-dock-head">
+                                        <strong>Staff</strong>
+                                        <span>{assignableStaff.length}</span>
+                                    </div>
+                                    <div className="modal-staff-list">
+                                        {assignableStaff.map((member) => {
+                                            const assigned = (modalSession?.session.waiterId || modalSummary?.waiterId || props.floorWaiterId) === member.id;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    className={`staff-chip ${assigned ? 'active' : ''}`}
+                                                    key={member.id}
+                                                    draggable
+                                                    onClick={() => pickStaff(member.id)}
+                                                    onDragStart={(event) => {
+                                                        event.dataTransfer.setData('text/staff-id', member.id);
+                                                        event.dataTransfer.effectAllowed = 'copyMove';
+                                                        setDragStaffId(member.id);
+                                                    }}
+                                                    onDragEnd={() => setDragStaffId('')}
+                                                >
+                                                    <strong>{member.name}</strong>
+                                                    <span>{humanStatus(member.role)}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+
+                                {modalSession && (
+                                    <>
+                                        <section className="modal-side-section">
+                                            <div className="totals-card">
+                                                <MoneyRow label="Subtotal" value={modalSession.session.subtotal}/>
+                                                <MoneyRow label="Service" value={modalSession.session.serviceCharge}/>
+                                                <MoneyRow label="GST" value={modalSession.session.taxTotal}/>
+                                                <MoneyRow label="Total" value={modalSession.session.total} strong/>
+                                            </div>
+                                            <div className="button-row">
+                                                <button type="button" disabled={props.busy === 'session-kot'} onClick={props.onSendKOT}>Send KOT</button>
+                                                <button type="button" disabled={props.busy === 'session-close'} onClick={props.onCloseSession}>Close Table</button>
+                                            </div>
+                                        </section>
+
+                                        <section className="modal-side-section">
+                                            <div className="approval-strip">
+                                                <Field label="Void PIN">
+                                                    <input
+                                                        type="password"
+                                                        value={props.lineVoidPIN}
+                                                        onChange={(event) => props.onLineVoidPIN(event.target.value)}
+                                                        placeholder="Manager PIN"
+                                                    />
+                                                </Field>
+                                                <Field label="Reason">
+                                                    <input
+                                                        value={props.lineVoidReason}
+                                                        onChange={(event) => props.onLineVoidReason(event.target.value)}
+                                                        placeholder="Guest changed order"
+                                                    />
+                                                </Field>
+                                            </div>
+                                        </section>
+
+                                        <section className="modal-side-section">
+                                            <div className="transfer-row">
+                                                {availableTargets.slice(0, 6).map((table) => (
+                                                    <button className="ghost-button" type="button" key={table.id} onClick={() => {
+                                                        setFocusedTableId(table.id);
+                                                        props.onTransferSession(table.id);
+                                                    }}>
+                                                        Move {table.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    </>
+                                )}
+                            </aside>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </section>
     );

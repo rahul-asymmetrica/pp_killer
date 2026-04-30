@@ -6,6 +6,10 @@ export function AddOrderSessionLine(arg1) {
   return window['go']['main']['App']['AddOrderSessionLine'](arg1);
 }
 
+export function AssignOrderSessionStaff(arg1) {
+  return window['go']['main']['App']['AssignOrderSessionStaff'](arg1);
+}
+
 export function AuthenticateStaff(arg1) {
   return window['go']['main']['App']['AuthenticateStaff'](arg1);
 }

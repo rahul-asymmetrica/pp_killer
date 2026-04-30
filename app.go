@@ -273,6 +273,13 @@ func (a *App) OpenOrderSession(input nexus.OpenOrderSessionInput) (nexus.OrderSe
 	return a.store.OpenOrderSession(input)
 }
 
+func (a *App) AssignOrderSessionStaff(input nexus.AssignOrderSessionStaffInput) (nexus.OrderSessionDetail, error) {
+	if err := a.ensureReady(); err != nil {
+		return nexus.OrderSessionDetail{}, err
+	}
+	return a.store.AssignOrderSessionStaff(input)
+}
+
 func (a *App) AddOrderSessionLine(input nexus.AddOrderSessionLineInput) (nexus.OrderSessionDetail, error) {
 	if err := a.ensureReady(); err != nil {
 		return nexus.OrderSessionDetail{}, err

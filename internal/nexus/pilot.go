@@ -499,6 +499,49 @@ func (s *Store) OpenOrderSession(input OpenOrderSessionInput) (OrderSessionDetai
 	return s.GetOrderSessionDetail(id)
 }
 
+func (s *Store) AssignOrderSessionStaff(input AssignOrderSessionStaffInput) (OrderSessionDetail, error) {
+	input.SessionID = strings.TrimSpace(input.SessionID)
+	input.StaffID = strings.TrimSpace(input.StaffID)
+	if input.SessionID == "" || input.StaffID == "" {
+		return OrderSessionDetail{}, errors.New("session and staff are required")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return OrderSessionDetail{}, err
+	}
+	defer rollback(tx)
+	if err := ensureSessionBusinessDateOpenTx(tx, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	var sessionStatus, staffName string
+	if err := tx.QueryRow("SELECT status FROM order_sessions WHERE id = ?", input.SessionID).Scan(&sessionStatus); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if sessionStatus != "open" && sessionStatus != "held" {
+		return OrderSessionDetail{}, fmt.Errorf("cannot assign staff to %s session", sessionStatus)
+	}
+	if err := tx.QueryRow("SELECT name FROM staff WHERE id = ? AND status = 'active'", input.StaffID).Scan(&staffName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return OrderSessionDetail{}, errors.New("assigned staff member is not active")
+		}
+		return OrderSessionDetail{}, err
+	}
+	if _, err := tx.Exec("UPDATE order_sessions SET waiter_id = ? WHERE id = ?", input.StaffID, input.SessionID); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	now := nowUTC()
+	if err := insertSessionEventTx(tx, input.SessionID, "staff_assigned", fmt.Sprintf("Assigned to %s", staffName), "operator", now); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if err := insertSyncLog(tx, "order_session", input.SessionID, "assign_staff", map[string]any{"sessionID": input.SessionID, "staffID": input.StaffID, "staffName": staffName}, now); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return OrderSessionDetail{}, err
+	}
+	return s.GetOrderSessionDetail(input.SessionID)
+}
+
 func (s *Store) AddOrderSessionLine(input AddOrderSessionLineInput) (OrderSessionDetail, error) {
 	if input.SessionID == "" || input.ItemID == "" {
 		return OrderSessionDetail{}, errors.New("session and item are required")

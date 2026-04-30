@@ -413,6 +413,20 @@ export namespace nexus {
 	        this.expiresAt = source["expiresAt"];
 	    }
 	}
+	export class AssignOrderSessionStaffInput {
+	    sessionId: string;
+	    staffId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AssignOrderSessionStaffInput(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.staffId = source["staffId"];
+	    }
+	}
 	export class AuditLogEntry {
 	    id: string;
 	    eventType: string;
